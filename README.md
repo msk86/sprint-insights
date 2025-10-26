@@ -1,153 +1,149 @@
 # Sprint Insights
 
-一个集成LLM能力的交付迭代数据展示和分析单页应用。
+A single-page application for displaying and analyzing delivery iteration data with integrated LLM capabilities.
 
-## 功能特性
+## Features
 
-- **团队配置管理**: 支持JIRA和Buildkite集成配置
-- **迭代数据展示**: 实时获取和展示Sprint数据
-- **历史趋势分析**: 多迭代数据对比和趋势图表
-- **AI智能分析**: 基于Claude Sonnet 4的迭代数据分析
-- **自由LLM交互**: 与AI助手进行自然语言对话
+- **Team Configuration Management**: Support for JIRA and Buildkite integration configuration
+- **Sprint Data Display**: Real-time fetching and display of Sprint data
+- **Historical Trend Analysis**: Multi-iteration data comparison and trend charts
+- **AI-Powered Analysis**: Sprint data analysis based on Claude Sonnet 4
+- **Free LLM Interaction**: Natural language conversation with AI assistant
 
-## 技术栈
+## Tech Stack
 
-### 后端
+### Backend
 - **TypeScript** + **Express** + **AWS Lambda**
 - **AWS Bedrock** (Claude Sonnet 4)
-- **AWS S3** (数据存储和缓存)
+- **AWS S3** (Data storage and caching)
 - **AWS API Gateway**
 
-### 前端
+### Frontend
 - **React** + **TypeScript**
 - **Material-UI (MUI)**
-- **Recharts** (数据可视化)
-- **Vite** (构建工具)
+- **Recharts** (Data visualization)
+- **Vite** (Build tool)
 
-### 基础设施
-- **AWS** (生产环境)
-- **LocalStack** (本地开发)
-- **Terraform** (基础设施即代码)
+### Infrastructure
+- **AWS** (Production environment)
+- **LocalStack** (Local development)
+- **Terraform** (Infrastructure as Code)
 
-## 快速开始
+## Quick Start
 
-### 环境要求
+### Prerequisites
 
 - Node.js 18+
 - Docker & Docker Compose
-- AWS CLI (用于部署)
-- Terraform (用于基础设施)
+- AWS CLI (for deployment)
+- Terraform (for infrastructure)
 
-### 本地开发
+### Local Development
 
-1. **克隆项目**
+1. **Clone the project**
 ```bash
 git clone <repository-url>
 cd sprint-insights
 ```
 
-2. **安装依赖**
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. **启动LocalStack并部署基础设施**
+3. **Start LocalStack and deploy infrastructure**
 ```bash
-# 设置LocalStack环境
+# Setup LocalStack environment
 chmod +x scripts/setup-localstack.sh
 ./scripts/setup-localstack.sh
 
-# 部署基础设施
+# Deploy infrastructure
 chmod +x scripts/deploy-local.sh
 ./scripts/deploy-local.sh
 ```
 
-5. **配置环境变量**
+4. **Configure environment variables**
 ```bash
 cp env.template .env.development
-# 编辑 .env.development 文件，填入你的JIRA和Buildkite配置
+# Edit .env.development file with your JIRA and Buildkite configuration
 ```
 
-6. **启动开发服务器**
+5. **Start development servers**
 ```bash
 npm run dev
 ```
 
-访问 http://localhost:3000 查看应用。
+Visit http://localhost:3000 to view the application.
 
-### 部署到AWS
+### Deploy to AWS
 
-1. **配置AWS凭证**
+1. **Configure AWS credentials**
 ```bash
 aws configure
 ```
 
-2. **部署基础设施**
+2. **Deploy infrastructure**
 ```bash
-# 使用生产环境部署脚本
+# Use production deployment script
 chmod +x scripts/deploy-production.sh
 ./scripts/deploy-production.sh
-
-# 或者使用原始部署脚本
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
 ```
 
-## 项目结构
+## Project Structure
 
 ```
 sprint-insights/
-├── api/                    # 后端API
+├── api/                    # Backend API
 │   ├── src/
-│   │   ├── controllers/    # API控制器
-│   │   ├── services/       # 业务服务
-│   │   ├── utils/          # 工具函数
-│   │   └── types/          # 类型定义
-│   └── serverless.yml      # Serverless配置
-├── app/                    # 前端应用
+│   │   ├── controllers/    # API controllers
+│   │   ├── services/       # Business services
+│   │   ├── utils/          # Utility functions
+│   │   └── types/          # Type definitions
+│   └── serverless.yml      # Serverless configuration
+├── app/                    # Frontend application
 │   ├── src/
-│   │   ├── components/     # React组件
-│   │   ├── pages/          # 页面组件
-│   │   ├── services/       # API服务
-│   │   └── types/          # 类型定义
-│   └── vite.config.ts     # Vite配置
-├── terraform/              # 基础设施代码
-├── scripts/                # 部署脚本
-└── docker-compose.yml      # LocalStack配置
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Page components
+│   │   ├── services/       # API services
+│   │   └── types/          # Type definitions
+│   └── vite.config.ts     # Vite configuration
+├── terraform/              # Infrastructure code
+├── scripts/                # Deployment scripts
+└── docker-compose.yml      # LocalStack configuration
 ```
 
-## API接口
+## API Endpoints
 
-### 团队管理
-- `GET /api/teams` - 获取团队列表
-- `POST /api/teams` - 创建团队
-- `PUT /api/teams/:teamId` - 更新团队
-- `DELETE /api/teams/:teamId` - 删除团队
+### Team Management
+- `GET /api/teams` - Get team list
+- `POST /api/teams` - Create team
+- `PUT /api/teams/:teamId` - Update team
+- `DELETE /api/teams/:teamId` - Delete team
 
-### 迭代数据
-- `GET /api/sprints` - 获取迭代数据
-- `GET /api/sprints/history` - 获取历史迭代数据
+### Sprint Data
+- `GET /api/sprints` - Get sprint data
+- `GET /api/sprints/history` - Get historical sprint data
 
-### LLM分析
-- `POST /api/llm/analyze` - 迭代数据分析
-- `POST /api/llm/chat` - 自由对话
+### LLM Analysis
+- `POST /api/llm/analyze` - Sprint data analysis
+- `POST /api/llm/chat` - Free conversation
 
-## 数据模型
+## Data Models
 
-### 团队配置
+### Team Configuration
 ```typescript
 interface TeamConfig {
   team: string;
   JIRA_EMAIL: string;
-  JIRA_TOKEN: string;        // 加密存储
+  JIRA_TOKEN: string;        // Encrypted storage
   JIRA_PROJECT: string;
   JIRA_BOARD_ID: string;
-  BUILDKITE_TOKEN: string;    // 加密存储
+  BUILDKITE_TOKEN: string;    // Encrypted storage
   BUILDKITE_PIPELINES: string;
 }
 ```
 
-### 迭代数据
+### Sprint Data
 ```typescript
 interface SprintData {
   sprint: SprintMeta;
@@ -157,9 +153,9 @@ interface SprintData {
 }
 ```
 
-## 环境变量
+## Environment Variables
 
-### 开发环境 (.env.development)
+### Development Environment (.env.development)
 ```bash
 AWS_REGION=us-east-1
 BEDROCK_REGION=us-east-1
@@ -172,7 +168,7 @@ BUILDKITE_ORG_SLUG=your-org-slug
 FRONTEND_URL=http://localhost:3000
 ```
 
-### 生产环境
+### Production Environment
 ```bash
 AWS_REGION=us-east-1
 BEDROCK_REGION=us-east-1
@@ -184,59 +180,59 @@ BUILDKITE_ORG_SLUG=your-org-slug
 FRONTEND_URL=https://your-frontend-domain.com
 ```
 
-## 开发指南
+## Development Guide
 
-### 添加新功能
+### Adding New Features
 
-1. **后端API**: 在 `api/src/` 下添加新的控制器和服务
-2. **前端组件**: 在 `app/src/components/` 下添加新的React组件
-3. **类型定义**: 在相应的 `types/` 目录下更新TypeScript类型
+1. **Backend API**: Add new controllers and services under `api/src/`
+2. **Frontend Components**: Add new React components under `app/src/components/`
+3. **Type Definitions**: Update TypeScript types in the respective `types/` directories
 
-### 测试
+### Testing
 
 ```bash
-# 运行API测试
+# Run API tests
 cd api && npm test
 
-# 运行前端测试
+# Run frontend tests
 cd app && npm test
 ```
 
-### 代码规范
+### Code Standards
 
-- 使用TypeScript严格模式
-- 遵循ESLint和Prettier配置
-- 编写单元测试
-- 使用语义化提交信息
+- Use TypeScript strict mode
+- Follow ESLint and Prettier configuration
+- Write unit tests
+- Use semantic commit messages
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Common Issues
 
-1. **LocalStack连接失败**
-   - 确保Docker服务正在运行
-   - 检查端口4566是否被占用
+1. **LocalStack Connection Failed**
+   - Ensure Docker service is running
+   - Check if port 4566 is occupied
 
-2. **API调用失败**
-   - 检查环境变量配置
-   - 确认LocalStack服务状态
+2. **API Call Failed**
+   - Check environment variable configuration
+   - Verify LocalStack service status
 
-3. **LLM分析失败**
-   - 验证Bedrock模型ID
-   - 检查AWS凭证配置
+3. **LLM Analysis Failed**
+   - Verify Bedrock model ID
+   - Check AWS credentials configuration
 
-## 贡献指南
+## Contributing
 
-1. Fork项目
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建Pull Request
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
 
-## 许可证
+## License
 
 MIT License
 
-## 联系方式
+## Contact
 
-如有问题或建议，请创建Issue或联系开发团队。
+For questions or suggestions, please create an Issue or contact the development team.
