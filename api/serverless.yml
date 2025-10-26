@@ -1,0 +1,54 @@
+service: sprint-insights-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  environment:
+    NODE_ENV: production
+    BEDROCK_REGION: ${env:BEDROCK_REGION, 'us-east-1'}
+    BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-3-5-sonnet-20241022'}
+    S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+    AWS_REGION: ${env:AWS_REGION, 'us-east-1'}
+    ENCRYPTION_KEY: ${env:ENCRYPTION_KEY}
+    FRONTEND_URL: ${env:FRONTEND_URL, 'https://your-frontend-domain.com'}
+    LOCALSTACK_ENDPOINT: ${env:LOCALSTACK_ENDPOINT, ''}
+    JIRA_BASE_URL: ${env:JIRA_BASE_URL, 'https://www.atlassian.net'}
+    BUILDKITE_ORG_SLUG: ${env:BUILDKITE_ORG_SLUG, 'org'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource: "arn:aws:s3:::${env:S3_BUCKET_NAME}/*"
+
+functions:
+  api:
+    handler: dist/index.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3001
+    host: 0.0.0.0

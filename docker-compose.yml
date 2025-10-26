@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  localstack:
+    container_name: sprint-insights-localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SERVICES=lambda,s3,bedrock,apigateway,iam
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_NETWORK=localstack-network
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./localstack-data:/var/lib/localstack"
+    networks:
+      - localstack-network
+
+networks:
+  localstack-network:
+    driver: bridge
