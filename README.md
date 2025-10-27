@@ -121,8 +121,7 @@ sprint-insights/
 - `DELETE /api/teams/:teamId` - Delete team
 
 ### Sprint Data
-- `GET /api/sprints` - Get sprint data
-- `GET /api/sprints/history` - Get historical sprint data
+- `GET /api/sprints` - Get sprint data (supports fuzzy search and index-based lookup)
 
 ### LLM Analysis
 - `POST /api/llm/analyze` - Sprint data analysis

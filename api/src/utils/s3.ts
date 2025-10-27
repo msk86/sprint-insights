@@ -23,9 +23,23 @@ function getS3Client(): S3Client {
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'sprint-insights-data';
 
-export async function getCachedSprintData(teamConfig: TeamConfig, sprintIdentifier: string | number): Promise<SprintData | null> {
+/**
+ * Generate a stable cache key for sprint data
+ * Uses sprint index as the stable identifier
+ */
+function generateSprintCacheKey(teamConfig: TeamConfig, sprintIndex: number): string {
+  const teamSlug = teamConfig.team.toLowerCase().replace(/\W/g, '-');
+  return `sprint-data/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}.json`;
+}
+
+/**
+ * Get cached sprint data using stable sprint index
+ * @param teamConfig - Team configuration
+ * @param sprintIndex - Resolved sprint index (not fuzzy identifier)
+ */
+export async function getCachedSprintData(teamConfig: TeamConfig, sprintIndex: number): Promise<SprintData | null> {
   try {
-    const key = `sprint-data/${teamConfig.team.toLowerCase().replace(/\W/g, '-')}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_${sprintIdentifier}.json`;
+    const key = generateSprintCacheKey(teamConfig, sprintIndex);
     
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
@@ -36,19 +50,26 @@ export async function getCachedSprintData(teamConfig: TeamConfig, sprintIdentifi
     const data = await response.Body?.transformToString();
     
     if (data) {
+      console.log(`Cache hit: ${key}`);
       return JSON.parse(data);
     }
     
     return null;
   } catch (error) {
-    console.log('No cached data found:', error);
+    // Expected when cache doesn't exist
     return null;
   }
 }
 
-export async function cacheSprintData(teamConfig: TeamConfig, sprintIdentifier: string | number, data: SprintData): Promise<void> {
+/**
+ * Cache sprint data using stable sprint index
+ * @param teamConfig - Team configuration
+ * @param sprintIndex - Resolved sprint index (not fuzzy identifier)
+ * @param data - Sprint data to cache
+ */
+export async function cacheSprintData(teamConfig: TeamConfig, sprintIndex: number, data: SprintData): Promise<void> {
   try {
-    const key = `sprint-data/${teamConfig.team.toLowerCase().replace(/\W/g, '-')}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_${sprintIdentifier}.json`;
+    const key = generateSprintCacheKey(teamConfig, sprintIndex);
     
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
@@ -58,7 +79,7 @@ export async function cacheSprintData(teamConfig: TeamConfig, sprintIdentifier: 
     });
     
     await getS3Client().send(command);
-    console.log(`Cached sprint data for ${teamConfig.team}_${sprintIdentifier}`);
+    console.log(`Cached sprint data: ${key}`);
   } catch (error) {
     console.error('Failed to cache sprint data:', error);
   }

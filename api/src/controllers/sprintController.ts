@@ -32,18 +32,25 @@ export class SprintController {
         BUILDKITE_TOKEN: decrypt(teamConfig.BUILDKITE_TOKEN)
       };
       
-      // Check cache first
-      const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIdentifier as string);
+      // Resolve fuzzy sprint identifier to stable sprint index
+      const jiraService = new JiraService(decryptedTeamConfig);
+      const sprintIndex = await jiraService.resolveSprintIdentifier(sprintIdentifier as string | number);
+      
+      console.log(`Resolved sprint identifier "${sprintIdentifier}" to index ${sprintIndex}`);
+      
+      // Check cache using stable sprint index
+      const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIndex);
       if (cachedData) {
+        console.log(`Cache hit for sprint index ${sprintIndex}`);
         res.json(cachedData);
         return;
       }
       
-      // Fetch fresh data
-      const jiraService = new JiraService(decryptedTeamConfig);
-      const buildkiteService = new BuildkiteService(decryptedTeamConfig);
+      console.log(`Cache miss for sprint index ${sprintIndex}, fetching fresh data`);
       
-      const sprintData = await jiraService.getSprintData(sprintIdentifier as string | number);
+      // Fetch fresh data using resolved sprint index
+      const buildkiteService = new BuildkiteService(decryptedTeamConfig);
+      const sprintData = await jiraService.getSprintData(sprintIndex);
       
       // Add build data if available
       if (decryptedTeamConfig.BUILDKITE_TOKEN) {
@@ -51,8 +58,8 @@ export class SprintController {
         sprintData.builds = builds;
       }
       
-      // Cache the data
-      await cacheSprintData(decryptedTeamConfig, sprintIdentifier as string, sprintData);
+      // Cache the data using stable sprint index
+      await cacheSprintData(decryptedTeamConfig, sprintIndex, sprintData);
       
       res.json(sprintData);
     } catch (error) {
@@ -61,60 +68,4 @@ export class SprintController {
     }
   }
 
-  async getHistoricalSprintData(req: Request, res: Response): Promise<void> {
-    try {
-      const { team, sprintIdentifier, historyCount } = req.query;
-      
-      if (!team || !sprintIdentifier) {
-        res.status(400).json({ error: 'Team and sprintIdentifier are required' });
-        return;
-      }
-      
-      const count = parseInt(historyCount as string) || 0;
-      
-      // Get team configuration
-      const teams = await getTeamConfigs();
-      const teamConfig = teams.find(t => t.team === team);
-      
-      if (!teamConfig) {
-        res.status(404).json({ error: 'Team not found' });
-        return;
-      }
-      
-      // Decrypt tokens for API calls
-      const decryptedTeamConfig: TeamConfig = {
-        ...teamConfig,
-        JIRA_TOKEN: decrypt(teamConfig.JIRA_TOKEN),
-        BUILDKITE_TOKEN: decrypt(teamConfig.BUILDKITE_TOKEN)
-      };
-      
-      const jiraService = new JiraService(decryptedTeamConfig);
-      
-      // Get current sprint data
-      const currentSprint = await jiraService.getSprintData(sprintIdentifier as string | number);
-      
-      // Get historical sprint data
-      const historicalSprints: SprintData[] = [];
-      for (let i = 1; i <= count; i++) {
-        try {
-          const historicalSprint = await jiraService.getSprintData(
-            typeof sprintIdentifier === 'number' 
-              ? (sprintIdentifier as number) - i 
-              : `HISTORICAL_${i}`
-          );
-          historicalSprints.push(historicalSprint);
-        } catch (error) {
-          console.warn(`Failed to get historical sprint ${i}:`, error);
-        }
-      }
-      
-      res.json({
-        currentSprint,
-        historicalSprints
-      });
-    } catch (error) {
-      console.error('Error getting historical sprint data:', error);
-      res.status(500).json({ error: 'Failed to get historical sprint data' });
-    }
-  }
 }

@@ -22,8 +22,9 @@ import {
   Search as SearchIcon,
   Chat as ChatIcon,
   Analytics as AnalyticsIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
-import { TeamConfig, SprintData, HistoricalSprintData, LLMAnalysisResponse } from '../types';
+import { TeamConfig, SprintData, LLMAnalysisResponse } from '../types';
 import { teamApi, sprintApi, llmApi } from '../services/api';
 import SprintIssuesTable from '../components/SprintIssuesTable';
 import SprintAnalysis from '../components/SprintAnalysis';
@@ -60,7 +61,7 @@ const SprintsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sprintData, setSprintData] = useState<SprintData | null>(null);
-  const [historicalData, setHistoricalData] = useState<HistoricalSprintData | null>(null);
+  const [historicalData, setHistoricalData] = useState<{ currentSprint: SprintData; historicalSprints: SprintData[] } | null>(null);
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysisResponse | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
@@ -92,16 +93,25 @@ const SprintsPage: React.FC = () => {
       const currentSprint = await sprintApi.getSprintData(selectedTeam, sprintIdentifier);
       setSprintData(currentSprint);
 
-      // Get historical data if requested
-      if (historyCount > 0) {
-        const historical = await sprintApi.getHistoricalSprintData(selectedTeam, sprintIdentifier, historyCount);
-        setHistoricalData(historical);
-      } else {
-        setHistoricalData(null);
+      // Get historical data if requested - make parallel calls for each historical sprint
+      let historicalSprints: SprintData[] = [];
+      if (historyCount > 0 && currentSprint.sprint.index !== undefined) {
+        const historicalPromises = Array.from({ length: historyCount }, (_, i) => {
+          const historicalIndex = currentSprint.sprint.index! - (i + 1);
+          return sprintApi.getSprintData(selectedTeam, historicalIndex).catch(err => {
+            console.warn(`Failed to get historical sprint at index ${historicalIndex}:`, err);
+            return null;
+          });
+        });
+
+        const results = await Promise.all(historicalPromises);
+        historicalSprints = results.filter((s): s is SprintData => s !== null);
       }
 
+      setHistoricalData(historicalSprints.length > 0 ? { currentSprint, historicalSprints } : null);
+
       // Get LLM analysis
-      const analysis = await llmApi.analyzeSprint(currentSprint, historicalData?.historicalSprints);
+      const analysis = await llmApi.analyzeSprint(currentSprint, historicalSprints);
       setLlmAnalysis(analysis);
 
     } catch (err) {
@@ -186,39 +196,83 @@ const SprintsPage: React.FC = () => {
       )}
 
       {sprintData && (
-        <Paper sx={{ width: '100%' }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={tabValue} onChange={handleTabChange}>
-              <Tab label="Issues" icon={<AnalyticsIcon />} />
-              <Tab label="Analysis" icon={<ChatIcon />} />
-              <Tab label="Trends" icon={<AnalyticsIcon />} />
-              <Tab label="LLM Chat" icon={<ChatIcon />} />
-            </Tabs>
-          </Box>
+        <Grid container spacing={2}>
+          <Grid item xs={12} lg={8}>
+            <Paper sx={{ width: '100%' }}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs value={tabValue} onChange={handleTabChange}>
+                  <Tab label="Sprint" icon={<InfoIcon />} />
+                  <Tab label="Issues" icon={<AnalyticsIcon />} />
+                  <Tab label="Analysis" icon={<ChatIcon />} />
+                  <Tab label="Trends" icon={<AnalyticsIcon />} />
+                </Tabs>
+              </Box>
 
-          <TabPanel value={tabValue} index={0}>
-            <SprintIssuesTable sprintData={sprintData} />
-          </TabPanel>
+              <TabPanel value={tabValue} index={0}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Sprint Information
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Name:</strong> {sprintData.sprint.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <strong>Index:</strong> {sprintData.sprint.index}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <strong>State:</strong> {sprintData.sprint.state}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <strong>Start Date:</strong> {new Date(sprintData.sprint.start).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <strong>End Date:</strong> {new Date(sprintData.sprint.end).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </TabPanel>
 
-          <TabPanel value={tabValue} index={1}>
-            <SprintAnalysis 
-              sprintData={sprintData} 
-              llmAnalysis={llmAnalysis}
-              loading={loading}
-            />
-          </TabPanel>
+              <TabPanel value={tabValue} index={1}>
+                <SprintIssuesTable sprintData={sprintData} />
+              </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
-            <SprintTrends 
-              currentSprint={sprintData}
-              historicalSprints={historicalData?.historicalSprints || []}
-            />
-          </TabPanel>
+              <TabPanel value={tabValue} index={2}>
+                <SprintAnalysis 
+                  sprintData={sprintData} 
+                  llmAnalysis={llmAnalysis}
+                  loading={loading}
+                />
+              </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
-            <LLMChat sprintData={sprintData} />
-          </TabPanel>
-        </Paper>
+              <TabPanel value={tabValue} index={3}>
+                <SprintTrends 
+                  currentSprint={sprintData}
+                  historicalSprints={historicalData?.historicalSprints || []}
+                />
+              </TabPanel>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} lg={4}>
+            <Paper 
+              sx={{ 
+                position: 'sticky',
+                top: 16,
+                height: 'calc(100vh - 232px)',
+                width: '100%',
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <LLMChat sprintData={sprintData} />
+            </Paper>
+          </Grid>
+        </Grid>
       )}
 
       {!sprintData && !loading && (

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TeamConfig, SprintData, LLMAnalysisResponse, HistoricalSprintData } from '../types';
+import { TeamConfig, SprintData, LLMAnalysisResponse } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -42,18 +42,6 @@ export const sprintApi = {
     const response = await api.get('/sprints', {
       params: { team, sprintIdentifier },
       timeout: 60000 // 60 seconds for sprint data fetching
-    });
-    return response.data;
-  },
-
-  getHistoricalSprintData: async (
-    team: string, 
-    sprintIdentifier: string | number, 
-    historyCount: number = 0
-  ): Promise<HistoricalSprintData> => {
-    const response = await api.get('/sprints/history', {
-      params: { team, sprintIdentifier, historyCount },
-      timeout: 60000 // 60 seconds for historical sprint data fetching
     });
     return response.data;
   }

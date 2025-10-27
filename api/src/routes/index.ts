@@ -18,7 +18,6 @@ router.delete('/teams/:teamId', (req, res) => teamController.deleteTeam(req, res
 
 // Sprint data routes
 router.get('/sprints', (req, res) => sprintController.getSprintData(req, res));
-router.get('/sprints/history', (req, res) => sprintController.getHistoricalSprintData(req, res));
 
 // LLM analysis routes
 router.post('/llm/analyze', (req, res) => llmController.analyzeSprint(req, res));

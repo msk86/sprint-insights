@@ -22,7 +22,9 @@ export interface SprintColumn {
 
 export interface IssueHistory {
   status: string;
+  statusId?: string;  // Status ID for mapping to board columns
   fromString: string;
+  fromStatusId?: string;  // Previous status ID
   toString: string;
   at: Date;
 }

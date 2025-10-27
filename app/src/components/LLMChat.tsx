@@ -83,16 +83,16 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
   };
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Typography variant="h6" gutterBottom>
         AI Assistant
       </Typography>
       
-      <Typography variant="body2" color="text.secondary" gutterBottom>
+      <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
         Ask questions about the sprint data and get AI-powered insights.
       </Typography>
 
-      <Paper sx={{ height: 400, display: 'flex', flexDirection: 'column' }}>
+      <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
           <List>
             {messages.map((message) => (
