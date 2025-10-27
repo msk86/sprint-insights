@@ -1,4 +1,11 @@
 import { Issue, SprintData } from '../types';
+import { calculateBusinessDays } from '../utils/timeCalculation';
+
+interface TimelineEvent {
+  timestamp: Date;
+  to?: string;
+  toStatus?: string;
+}
 
 export interface IssueFlags {
   isBlocked: boolean;
@@ -183,3 +190,45 @@ export const FLAG_FILTERS = [
   { key: 'isClosed', label: 'Closed' }
 ] as const;
 
+/**
+ * Calculate time spent on each column for an issue during a sprint
+ * The backend already handles boundary events, so we just process the timeline
+ */
+export function calculateIssueTimeSpentOnColumns(
+  issue: Issue,
+  sprintData: SprintData
+): Record<string, number> {
+  const columns = sprintData.columns;
+  
+  // Build timeline from all history events (backend already added boundary events)
+  const timelineEvents: TimelineEvent[] = issue.history.map(h => ({
+    timestamp: new Date(h.at),
+    to: h.statusId,
+    toStatus: h.toString
+  }));
+
+  const timeSpentOnColumnsInSprint: Record<string, number> = {};
+  
+  // Calculate time spent between consecutive events
+  for (let i = 0; i < timelineEvents.length - 1; i++) {
+    const currentEvent = timelineEvents[i];
+    const nextEvent = timelineEvents[i + 1];
+    const columnName = currentEvent.toStatus || 'Unknown';
+    
+    // Initialize column tracking if not exists
+    if (!timeSpentOnColumnsInSprint[columnName]) {
+      timeSpentOnColumnsInSprint[columnName] = 0;
+    }
+    
+    const timeSpent = calculateBusinessDays(currentEvent.timestamp, nextEvent.timestamp);
+    timeSpentOnColumnsInSprint[columnName] += timeSpent;
+  }
+
+  // Remove first and last columns (as per requirement)
+  if (columns.length > 0) {
+    delete timeSpentOnColumnsInSprint[columns[0].name];
+    delete timeSpentOnColumnsInSprint[columns[columns.length - 1].name];
+  }
+
+  return timeSpentOnColumnsInSprint;
+}

@@ -82,14 +82,6 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                     {stats.avgStoryPoints.toFixed(1)}
                   </Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Sprint Duration
-                  </Typography>
-                  <Typography variant="h4">
-                    {Math.ceil((new Date(sprintData.sprint.end).getTime() - new Date(sprintData.sprint.start).getTime()) / (1000 * 60 * 60 * 24))} days
-                  </Typography>
-                </Grid>
               </Grid>
             </CardContent>
           </Card>
