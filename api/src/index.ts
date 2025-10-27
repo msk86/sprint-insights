@@ -1,19 +1,12 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import dotenv from 'dotenv';
 import serverless from 'serverless-http';
 import routes from './routes';
 
-// Load environment variables based on NODE_ENV
-// In production (AWS Lambda), environment variables are provided by Serverless Framework
-// In development, load from .env.development file
-if (process.env.NODE_ENV !== 'production') {
-  const path = require('path');
-  const envPath = path.resolve(__dirname, '../../.env.development');
-  dotenv.config({ path: envPath });
-}
+dotenv.config({ path: process.env.ENV_FILE || '.env' });
 
 const app = express();
 

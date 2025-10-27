@@ -4,15 +4,16 @@ import { LLMAnalysisRequest, LLMAnalysisResponse, SprintData } from '../types';
 export class LLMService {
   private client: BedrockRuntimeClient;
   private modelId: string;
+  private region: string;
 
   constructor() {
+    this.region = process.env.BEDROCK_REGION || 'us-east-1';
+    this.modelId = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-20250514-v1:0';
+
+    // Always use real AWS Bedrock service (LocalStack doesn't support Bedrock)
     this.client = new BedrockRuntimeClient({
-      region: process.env.BEDROCK_REGION || 'us-east-1',
-      ...(process.env.LOCALSTACK_ENDPOINT && {
-        endpoint: process.env.LOCALSTACK_ENDPOINT
-      })
+      region: this.region
     });
-    this.modelId = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-5-sonnet-20241022';
   }
 
   async analyzeSprint(request: LLMAnalysisRequest): Promise<LLMAnalysisResponse> {
@@ -35,7 +36,7 @@ export class LLMService {
 SPRINT DATA:
 - Sprint Name: ${sprintData.sprint.name}
 - Sprint State: ${sprintData.sprint.state}
-- Sprint Period: ${sprintData.sprint.start.toISOString()} to ${sprintData.sprint.end.toISOString()}
+- Sprint Period: ${sprintData.sprint.start} to ${sprintData.sprint.end}
 - Total Issues: ${sprintData.issues.length}
 - Total Story Points: ${sprintData.issues.reduce((sum, issue) => sum + issue.storyPoints, 0)}
 
@@ -68,7 +69,7 @@ Focus on actionable insights that can help improve team performance.`;
 SPRINT DATA:
 - Sprint Name: ${sprintData.sprint.name}
 - Sprint State: ${sprintData.sprint.state}
-- Sprint Period: ${sprintData.sprint.start.toISOString()} to ${sprintData.sprint.end.toISOString()}
+- Sprint Period: ${sprintData.sprint.start} to ${sprintData.sprint.end}
 - Total Issues: ${sprintData.issues.length}
 - Total Story Points: ${sprintData.issues.reduce((sum, issue) => sum + issue.storyPoints, 0)}
 

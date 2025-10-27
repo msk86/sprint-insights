@@ -3,13 +3,8 @@ import { LLMAnalysisRequest, LLMAnalysisResponse } from '../types';
 import { LLMService } from '../services/llmService';
 
 export class LLMController {
-  private llmService: LLMService;
-
-  constructor() {
-    this.llmService = new LLMService();
-  }
-
   async analyzeSprint(req: Request, res: Response): Promise<void> {
+    res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
@@ -17,7 +12,8 @@ export class LLMController {
         analysisType: 'sprint_analysis'
       };
 
-      const analysis = await this.llmService.analyzeSprint(request);
+      const llmService = new LLMService();
+      const analysis = await llmService.analyzeSprint(request);
       res.json(analysis);
     } catch (error) {
       console.error('Error analyzing sprint:', error);
@@ -26,6 +22,7 @@ export class LLMController {
   }
 
   async freeChat(req: Request, res: Response): Promise<void> {
+    res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
@@ -33,7 +30,8 @@ export class LLMController {
         analysisType: 'free_chat'
       };
 
-      const response = await this.llmService.freeChat(request);
+      const llmService = new LLMService();
+      const response = await llmService.freeChat(request);
       res.json(response);
     } catch (error) {
       console.error('Error in free chat:', error);
