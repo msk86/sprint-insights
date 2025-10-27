@@ -27,25 +27,43 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
   currentSprint, 
   historicalSprints 
 }) => {
+  const extractSprintIndex = (sprintName: string, sprintIndex: number): string => {
+    // Extract sprint index using regex pattern
+    const match = sprintName.match(/(^|\D)(\d{1,4})(\D|$)/);
+    if (match && match[2]) {
+      return match[2];
+    }
+    // Fallback to sprint.index if available
+    return `${sprintIndex}`;
+  };
+
   const prepareTrendData = () => {
-    const allSprints = [...historicalSprints, currentSprint].reverse();
+    // Combine all sprints and sort by index in ascending order
+    const allSprints = [...historicalSprints, currentSprint].sort((a, b) => {
+      const indexA = a.sprint.index ?? 0;
+      const indexB = b.sprint.index ?? 0;
+      return indexA - indexB;
+    });
     
-    return allSprints.map((sprint, index) => ({
-      name: `Sprint ${index + 1}`,
-      sprintName: sprint.sprint.name,
-      totalIssues: sprint.issues.length,
-      totalStoryPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
-      avgStoryPoints: sprint.issues.length > 0 
-        ? sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0) / sprint.issues.length 
-        : 0,
-      categories: Object.keys(
-        sprint.issues.reduce((acc, issue) => {
-          const category = issue.subCategory || 'Uncategorized';
-          acc[category] = (acc[category] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      ).length,
-    }));
+    return allSprints.map((sprint) => {
+      const sprintIndex = extractSprintIndex(sprint.sprint.name, sprint.sprint.index);
+      return {
+        name: `Sprint ${sprintIndex}`,
+        sprintName: sprint.sprint.name,
+        totalIssues: sprint.issues.length,
+        totalStoryPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+        avgStoryPoints: sprint.issues.length > 0 
+          ? sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0) / sprint.issues.length 
+          : 0,
+        categories: Object.keys(
+          sprint.issues.reduce((acc, issue) => {
+            const category = issue.subCategory || 'Uncategorized';
+            acc[category] = (acc[category] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        ).length,
+      };
+    });
   };
 
   const trendData = prepareTrendData();
@@ -78,12 +96,12 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
                         name === 'totalStoryPoints' ? 'Total Story Points' :
                         'Avg Story Points'
                       ]}
-                      labelFormatter={(label, payload) => {
-                        if (payload && payload[0]) {
+                      labelFormatter={((label: any, payload: any) => {
+                        if (payload && payload.length > 0 && payload[0]?.payload) {
                           return `Sprint: ${payload[0].payload.sprintName}`;
                         }
                         return label;
-                      }}
+                      }) as any}
                     />
                     <Legend />
                     <Line 
@@ -109,42 +127,6 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Sprint Summary
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {trendData.map((sprint, index) => (
-                  <Card key={index} variant="outlined" sx={{ minWidth: 200 }}>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        {sprint.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {sprint.sprintName}
-                      </Typography>
-                      <Typography variant="body2">
-                        Issues: {sprint.totalIssues}
-                      </Typography>
-                      <Typography variant="body2">
-                        Story Points: {sprint.totalStoryPoints}
-                      </Typography>
-                      <Typography variant="body2">
-                        Avg Points: {sprint.avgStoryPoints.toFixed(1)}
-                      </Typography>
-                      <Typography variant="body2">
-                        Categories: {sprint.categories}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                ))}
               </Box>
             </CardContent>
           </Card>

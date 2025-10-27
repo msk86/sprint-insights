@@ -89,8 +89,8 @@ const SprintsPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Get current sprint data
-      const currentSprint = await sprintApi.getSprintData(selectedTeam, sprintIdentifier);
+      // Get current sprint data (use 'name' since user enters sprint name)
+      const currentSprint = await sprintApi.getSprintData(selectedTeam, sprintIdentifier, 'name');
       setSprintData(currentSprint);
 
       // Get historical data if requested - make parallel calls for each historical sprint
@@ -98,7 +98,7 @@ const SprintsPage: React.FC = () => {
       if (historyCount > 0 && currentSprint.sprint.index !== undefined) {
         const historicalPromises = Array.from({ length: historyCount }, (_, i) => {
           const historicalIndex = currentSprint.sprint.index! - (i + 1);
-          return sprintApi.getSprintData(selectedTeam, historicalIndex).catch(err => {
+          return sprintApi.getSprintData(selectedTeam, historicalIndex, 'index').catch(err => {
             console.warn(`Failed to get historical sprint at index ${historicalIndex}:`, err);
             return null;
           });
@@ -122,7 +122,7 @@ const SprintsPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
@@ -165,7 +165,7 @@ const SprintsPage: React.FC = () => {
                 <Typography gutterBottom>Historical Sprints: {historyCount}</Typography>
                 <Slider
                   value={historyCount}
-                  onChange={(e, value) => setHistoryCount(value as number)}
+                  onChange={(_e, value) => setHistoryCount(value as number)}
                   min={0}
                   max={12}
                   step={1}
@@ -189,12 +189,6 @@ const SprintsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
       {sprintData && (
         <Grid container spacing={2}>
           <Grid item xs={12} lg={8}>
@@ -207,6 +201,12 @@ const SprintsPage: React.FC = () => {
                   <Tab label="Trends" icon={<AnalyticsIcon />} />
                 </Tabs>
               </Box>
+
+              {error && (
+                <Alert severity="error" sx={{ m: 2 }} onClose={() => setError(null)}>
+                  {error}
+                </Alert>
+              )}
 
               <TabPanel value={tabValue} index={0}>
                 <Card>

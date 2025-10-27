@@ -291,15 +291,30 @@ export class JiraService {
   }
 
   /**
-   * Resolve a fuzzy sprint identifier to a stable sprint index
+   * Resolve a sprint identifier to a stable sprint index
    * This should be called BEFORE checking cache to ensure consistent cache keys
+   * 
+   * @param sprintIdentifier - Sprint name or index
+   * @param type - Required type: 'index' for numeric index, 'name' for fuzzy name search
    */
-  async resolveSprintIdentifier(sprintIdentifier: string | number): Promise<number> {
-    if (typeof sprintIdentifier === 'number') {
-      return sprintIdentifier;
+  async resolveSprintIdentifier(
+    sprintIdentifier: string | number, 
+    type: 'index' | 'name'
+  ): Promise<number> {
+    // If type is 'index', treat as numeric index
+    if (type === 'index') {
+      const index = typeof sprintIdentifier === 'number' 
+        ? sprintIdentifier 
+        : parseInt(sprintIdentifier as string, 10);
+      
+      if (isNaN(index)) {
+        throw new Error(`Invalid sprint index: ${sprintIdentifier}`);
+      }
+      return index;
     }
     
-    const indexResult = await this.getSprintIndex(sprintIdentifier);
+    // If type is 'name', treat as fuzzy name search
+    const indexResult = await this.getSprintIndex(sprintIdentifier as string);
     return indexResult.current;
   }
 

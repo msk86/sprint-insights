@@ -9,10 +9,16 @@ import { decrypt } from '../utils/encryption';
 export class SprintController {
   async getSprintData(req: Request, res: Response): Promise<void> {
     try {
-      const { team, sprintIdentifier } = req.query;
+      const { team, sprintIdentifier, identifierType } = req.query;
       
-      if (!team || !sprintIdentifier) {
-        res.status(400).json({ error: 'Team and sprintIdentifier are required' });
+      if (!team || !sprintIdentifier || !identifierType) {
+        res.status(400).json({ error: 'Team, sprintIdentifier, and identifierType are required' });
+        return;
+      }
+      
+      // Validate identifierType
+      if (identifierType !== 'index' && identifierType !== 'name') {
+        res.status(400).json({ error: 'identifierType must be either "index" or "name"' });
         return;
       }
       
@@ -32,11 +38,12 @@ export class SprintController {
         BUILDKITE_TOKEN: decrypt(teamConfig.BUILDKITE_TOKEN)
       };
       
-      // Resolve fuzzy sprint identifier to stable sprint index
+      // Resolve sprint identifier to stable sprint index
       const jiraService = new JiraService(decryptedTeamConfig);
-      const sprintIndex = await jiraService.resolveSprintIdentifier(sprintIdentifier as string | number);
+      const type = identifierType as 'index' | 'name';
+      const sprintIndex = await jiraService.resolveSprintIdentifier(sprintIdentifier as string | number, type);
       
-      console.log(`Resolved sprint identifier "${sprintIdentifier}" to index ${sprintIndex}`);
+      console.log(`Resolved sprint identifier "${sprintIdentifier}" (type: ${type}) to index ${sprintIndex}`);
       
       // Check cache using stable sprint index
       const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIndex);

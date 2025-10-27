@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { TeamConfig, SprintData, LLMAnalysisResponse } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -38,9 +38,17 @@ export const teamApi = {
 
 // Sprint data API
 export const sprintApi = {
-  getSprintData: async (team: string, sprintIdentifier: string | number): Promise<SprintData> => {
+  getSprintData: async (
+    team: string, 
+    sprintIdentifier: string | number, 
+    identifierType: 'index' | 'name'
+  ): Promise<SprintData> => {
     const response = await api.get('/sprints', {
-      params: { team, sprintIdentifier },
+      params: { 
+        team, 
+        sprintIdentifier,
+        identifierType
+      },
       timeout: 60000 // 60 seconds for sprint data fetching
     });
     return response.data;
