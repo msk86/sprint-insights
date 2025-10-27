@@ -14,6 +14,7 @@ import {
 import { Send as SendIcon } from '@mui/icons-material';
 import { SprintData, LLMAnalysisResponse } from '../types';
 import { llmApi } from '../services/api';
+import { formatTime } from '../utils/dateFormat';
 
 interface ChatMessage {
   id: string;
@@ -111,7 +112,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
                     {message.content}
                   </Typography>
                   <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5 }}>
-                    {message.timestamp.toLocaleTimeString()}
+                    {formatTime(message.timestamp)}
                   </Typography>
                 </Box>
               </ListItem>

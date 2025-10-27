@@ -13,6 +13,7 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 import { SprintData, Issue } from '../types';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 interface SprintIssuesTableProps {
   sprintData: SprintData;
@@ -98,14 +99,14 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
         Sprint Issues ({sprintData.issues.length} total)
       </Typography>
       
-      <Box sx={{ height: 400, width: '100%' }}>
+      <Box sx={{ height: 480, width: '100%' }}>
         <DataGrid
           rows={sprintData.issues}
           columns={columns}
-          pageSizeOptions={[10, 25, 50]}
+          pageSizeOptions={[15, 30, 50]}
           initialState={{
             pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
+              paginationModel: { page: 0, pageSize: 15 },
             },
           }}
           disableRowSelectionOnClick
@@ -128,7 +129,7 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
                 {selectedIssue.summary}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Created: {new Date(selectedIssue.created).toLocaleDateString()}
+                Created: {formatDate(selectedIssue.created)}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Story Points: {selectedIssue.storyPoints}
@@ -148,7 +149,7 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
                         <strong>{history.fromString}</strong> → <strong>{history.toString}</strong>
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(history.at).toLocaleString()}
+                        {formatDateTime(history.at)}
                       </Typography>
                     </Box>
                   ))}

@@ -27,8 +27,16 @@ const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'sprint-insights-data';
  * Generate a stable cache key for sprint data
  * Uses sprint index as the stable identifier
  */
-function generateSprintCacheKey(teamConfig: TeamConfig, sprintIndex: number): string {
+function generateSprintCacheKey(teamConfig: TeamConfig, sprintIndex: number, isActive: boolean = false): string {
   const teamSlug = teamConfig.team.toLowerCase().replace(/\W/g, '-');
+  
+  // For active sprints, include today's date in the cache key for daily caching
+  if (isActive) {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    return `sprint-data/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}_date-${today}.json`;
+  }
+  
+  // For closed sprints, use permanent cache key
   return `sprint-data/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}.json`;
 }
 
@@ -36,10 +44,11 @@ function generateSprintCacheKey(teamConfig: TeamConfig, sprintIndex: number): st
  * Get cached sprint data using stable sprint index
  * @param teamConfig - Team configuration
  * @param sprintIndex - Resolved sprint index (not fuzzy identifier)
+ * @param isActive - Whether the sprint is active (for daily caching)
  */
-export async function getCachedSprintData(teamConfig: TeamConfig, sprintIndex: number): Promise<SprintData | null> {
+export async function getCachedSprintData(teamConfig: TeamConfig, sprintIndex: number, isActive: boolean = false): Promise<SprintData | null> {
   try {
-    const key = generateSprintCacheKey(teamConfig, sprintIndex);
+    const key = generateSprintCacheKey(teamConfig, sprintIndex, isActive);
     
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
@@ -69,7 +78,9 @@ export async function getCachedSprintData(teamConfig: TeamConfig, sprintIndex: n
  */
 export async function cacheSprintData(teamConfig: TeamConfig, sprintIndex: number, data: SprintData): Promise<void> {
   try {
-    const key = generateSprintCacheKey(teamConfig, sprintIndex);
+    // Determine if sprint is active based on the data
+    const isActive = data.sprint.state === 'active';
+    const key = generateSprintCacheKey(teamConfig, sprintIndex, isActive);
     
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
@@ -79,7 +90,7 @@ export async function cacheSprintData(teamConfig: TeamConfig, sprintIndex: numbe
     });
     
     await getS3Client().send(command);
-    console.log(`Cached sprint data: ${key}`);
+    console.log(`Cached sprint data: ${key}${isActive ? ' (daily cache for active sprint)' : ''}`);
   } catch (error) {
     console.error('Failed to cache sprint data:', error);
   }

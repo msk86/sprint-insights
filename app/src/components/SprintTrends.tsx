@@ -89,12 +89,11 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
                     <YAxis />
                     <Tooltip 
                       formatter={(value, name) => [
-                        name === 'totalIssues' ? `${value} issues` : 
-                        name === 'totalStoryPoints' ? `${value} points` : 
-                        `${value} avg points`,
-                        name === 'totalIssues' ? 'Total Issues' :
-                        name === 'totalStoryPoints' ? 'Total Story Points' :
-                        'Avg Story Points'
+                        name === 'Total Issues' ? `${value} issues` : 
+                        name === 'Total Story Points' ? `${value} points` : 
+                        name === 'Avg Story Points' ? `${value} avg points` :
+                        `${value}`,
+                        name
                       ]}
                       labelFormatter={((label: any, payload: any) => {
                         if (payload && payload.length > 0 && payload[0]?.payload) {

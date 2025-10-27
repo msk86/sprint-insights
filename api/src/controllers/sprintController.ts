@@ -45,10 +45,14 @@ export class SprintController {
       
       console.log(`Resolved sprint identifier "${sprintIdentifier}" (type: ${type}) to index ${sprintIndex}`);
       
-      // Check cache using stable sprint index
-      const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIndex);
+      // Get sprint metadata to determine if it's active (for cache key generation)
+      const sprintMetadata = await jiraService.getSprintMetadata(sprintIndex);
+      const isActive = sprintMetadata.state === 'active';
+      
+      // Check cache using stable sprint index and active state
+      const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIndex, isActive);
       if (cachedData) {
-        console.log(`Cache hit for sprint index ${sprintIndex}`);
+        console.log(`Cache hit for sprint index ${sprintIndex}${isActive ? ' (active sprint - daily cache)' : ''}`);
         res.json(cachedData);
         return;
       }

@@ -30,6 +30,7 @@ import SprintIssuesTable from '../components/SprintIssuesTable';
 import SprintAnalysis from '../components/SprintAnalysis';
 import SprintTrends from '../components/SprintTrends';
 import LLMChat from '../components/LLMChat';
+import { formatDate, formatDateRange } from '../utils/dateFormat';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -209,6 +210,12 @@ const SprintsPage: React.FC = () => {
               )}
 
               <TabPanel value={tabValue} index={0}>
+                {sprintData.sprint.state === 'active' && (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    This sprint is currently active. Data may change as the sprint progresses. 
+                    The data is cached daily and may not reflect real-time updates.
+                  </Alert>
+                )}
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -225,10 +232,13 @@ const SprintsPage: React.FC = () => {
                         <strong>State:</strong> {sprintData.sprint.state}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        <strong>Start Date:</strong> {new Date(sprintData.sprint.start).toLocaleDateString()}
+                        <strong>Start Date:</strong> {formatDate(sprintData.sprint.start)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        <strong>End Date:</strong> {new Date(sprintData.sprint.end).toLocaleDateString()}
+                        <strong>End Date:</strong> {formatDate(sprintData.sprint.end)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        <strong>Duration:</strong> {formatDateRange(sprintData.sprint.start, sprintData.sprint.end)}
                       </Typography>
                     </Box>
                   </CardContent>
