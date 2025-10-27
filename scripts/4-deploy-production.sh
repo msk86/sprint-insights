@@ -15,6 +15,7 @@ cd terraform
 
 # Set environment variables for production
 export TF_VAR_use_localstack=false
+export TF_VAR_skip_lambda=false
 
 # Initialize Terraform
 echo "📦 Initializing Terraform..."

@@ -39,3 +39,9 @@ variable "api_gateway_stage" {
   type        = string
   default     = "dev"
 }
+
+variable "skip_lambda" {
+  description = "Skip Lambda and API Gateway creation (for local dev with direct Node.js execution)"
+  type        = bool
+  default     = true
+}

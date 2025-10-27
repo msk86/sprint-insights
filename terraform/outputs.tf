@@ -1,6 +1,6 @@
 output "api_gateway_url" {
-  description = "API Gateway URL"
-  value       = "${aws_api_gateway_deployment.sprint_insights_api.invoke_url}/api"
+  description = "API Gateway URL (only available when skip_lambda=false)"
+  value       = var.skip_lambda ? "N/A - Use local dev server" : "${aws_api_gateway_stage.sprint_insights_api[0].invoke_url}/api"
 }
 
 output "s3_bucket_name" {
@@ -9,6 +9,6 @@ output "s3_bucket_name" {
 }
 
 output "lambda_function_name" {
-  description = "Lambda function name"
-  value       = aws_lambda_function.sprint_insights_api.function_name
+  description = "Lambda function name (only available when skip_lambda=false)"
+  value       = var.skip_lambda ? "N/A - Use local dev server" : aws_lambda_function.sprint_insights_api[0].function_name
 }

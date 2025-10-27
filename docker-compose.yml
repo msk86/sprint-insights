@@ -1,23 +1,32 @@
-version: '3.8'
-
 services:
   localstack:
     container_name: sprint-insights-localstack
     image: localstack/localstack:latest
     ports:
       - "4566:4566"            # LocalStack Gateway
-      - "4510-4559:4510-4559"  # External services port range
     environment:
-      - DEBUG=1
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - SERVICES=lambda,s3,bedrock,apigateway,iam
-      - LAMBDA_EXECUTOR=docker
-      - DOCKER_NETWORK=localstack-network
+      # Performance optimizations
+      - DEBUG=0                                    # Disable debug logging for speed
+      - SERVICES=lambda,s3,apigateway,iam         # Only enable needed services
+      - LAMBDA_EXECUTOR=local                     # Use local executor (much faster than docker)
+      - LAMBDA_REMOTE_DOCKER=0                    # Disable remote docker
+      - SKIP_INFRA_DOWNLOADS=1                    # Skip unnecessary downloads
+      - SKIP_SSL_CERT_DOWNLOAD=1                  # Skip SSL cert download
+      - EAGER_SERVICE_LOADING=1                   # Load services at startup (not on-demand)
+      # Persist data
+      - PERSISTENCE=1                             # Enable persistence
+      # Other settings
+      - AWS_DEFAULT_REGION=us-east-1
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
       - "./localstack-data:/var/lib/localstack"
     networks:
       - localstack-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   localstack-network:
