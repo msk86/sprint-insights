@@ -191,6 +191,7 @@ export class JiraService {
     if (lastEventBeforeSprint) {
       const columnName = mapToColumn(lastEventBeforeSprint);
       timelineEvents.push({
+        inSprint: false,
         status: columnName,  // Use column name instead of status
         statusId: lastEventBeforeSprint.statusId,
         fromString: lastEventBeforeSprint.fromString,
@@ -203,6 +204,7 @@ export class JiraService {
     // Add all events that happened during the sprint, mapping statuses to columns
     timelineEvents.push(...historiesInSprint.map(h => ({
       ...h,
+      inSprint: true,
       status: mapToColumn(h),
       toString: mapToColumn(h)
     })));
@@ -216,6 +218,7 @@ export class JiraService {
         : (lastEventBeforeSprint ? mapToColumn(lastEventBeforeSprint) : '');
       
       timelineEvents.push({
+        inSprint: false,
         status: columnName,
         statusId: firstEventAfterSprint.statusId,
         fromString: previousColumn,
@@ -233,6 +236,7 @@ export class JiraService {
       if (!isCompleted) {
         // Issue was still in progress at sprint end
         timelineEvents.push({
+          inSprint: false,
           status: lastColumn,
           statusId: lastEvent.statusId,
           fromString: lastColumn,

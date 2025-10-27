@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -20,12 +21,14 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import { TeamConfig } from '../types';
 import { teamApi } from '../services/api';
 import TeamForm from '../components/TeamForm';
 
 const TeamsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<TeamConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +103,18 @@ const TeamsPage: React.FC = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          Team Management
-        </Typography>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/sprints')}
+          >
+            Back
+          </Button>
+          <Typography variant="h4" component="h1">
+            Team Management
+          </Typography>
+        </Box>
         <Button
           variant="contained"
           startIcon={<AddIcon />}

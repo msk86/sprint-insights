@@ -21,10 +21,22 @@ export interface SprintColumn {
 }
 
 export interface IssueHistory {
+  inSprint: boolean;
   status: string;
   fromString: string;
   toString: string;
   at: Date;
+}
+
+export interface IssueFlags {
+  isBlocked: boolean;
+  isIncidentResponse: boolean;
+  isNotStarted: boolean;
+  isBackAndForth: boolean;
+  isUnplanned: boolean;
+  isSpillover: boolean;
+  isCompleted: boolean;
+  isClosed: boolean;
 }
 
 export interface Issue {
@@ -35,6 +47,7 @@ export interface Issue {
   storyPoints: number;
   subCategory: string;
   history: IssueHistory[];
+  flags?: IssueFlags;
 }
 
 export interface Build {

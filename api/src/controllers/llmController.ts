@@ -4,7 +4,7 @@ import { LLMService } from '../services/llmService';
 
 export class LLMController {
   async analyzeSprint(req: Request, res: Response): Promise<void> {
-    res.json({});
+    return res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
@@ -22,7 +22,7 @@ export class LLMController {
   }
 
   async freeChat(req: Request, res: Response): Promise<void> {
-    res.json({});
+    return res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,

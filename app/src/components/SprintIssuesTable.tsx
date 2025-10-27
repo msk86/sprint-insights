@@ -143,16 +143,18 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
                   <Typography variant="h6" gutterBottom>
                     Status History
                   </Typography>
-                  {selectedIssue.history.map((history, index) => (
-                    <Box key={index} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                      <Typography variant="body2">
-                        <strong>{history.fromString}</strong> → <strong>{history.toString}</strong>
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDateTime(history.at)}
-                      </Typography>
-                    </Box>
-                  ))}
+                  {selectedIssue.history
+                    .filter(history => history.inSprint)
+                    .map((history, index) => (
+                      <Box key={index} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Typography variant="body2">
+                          <strong>{history.fromString}</strong> → <strong>{history.toString}</strong>
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDateTime(history.at)}
+                        </Typography>
+                      </Box>
+                    ))}
                 </Box>
               )}
             </Box>

@@ -21,6 +21,7 @@ export interface SprintColumn {
 }
 
 export interface IssueHistory {
+  inSprint: boolean;
   status: string;
   statusId?: string;  // Status ID for mapping to board columns
   fromString: string;

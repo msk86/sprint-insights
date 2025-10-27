@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -17,6 +17,8 @@ import {
   Tabs,
   Tab,
   Paper,
+  Chip,
+  Stack,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -31,6 +33,7 @@ import SprintAnalysis from '../components/SprintAnalysis';
 import SprintTrends from '../components/SprintTrends';
 import LLMChat from '../components/LLMChat';
 import { formatDate, formatDateRange } from '../utils/dateFormat';
+import { applyIssueFlagsToSprintData, FLAG_FILTERS } from '../services/issue';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -65,6 +68,48 @@ const SprintsPage: React.FC = () => {
   const [historicalData, setHistoricalData] = useState<{ currentSprint: SprintData; historicalSprints: SprintData[] } | null>(null);
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysisResponse | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
+  const [selectedFlags, setSelectedFlags] = useState<string[]>([]);
+
+  // Get unique sub-categories from sprint data
+  const subCategories = useMemo(() => {
+    if (!sprintData) return [];
+    const categories = Array.from(new Set(sprintData.issues.map(issue => issue.subCategory)));
+    return categories.sort();
+  }, [sprintData]);
+
+  // Filter issues by selected sub-categories and flags
+  const filteredIssues = useMemo(() => {
+    if (!sprintData) return [];
+    
+    let issues = sprintData.issues;
+    
+    // Filter by sub-categories
+    if (selectedSubCategories.length > 0) {
+      issues = issues.filter(issue => selectedSubCategories.includes(issue.subCategory));
+    }
+    
+    // Filter by flags
+    if (selectedFlags.length > 0) {
+      issues = issues.filter(issue => {
+        if (!issue.flags) return false;
+        return selectedFlags.some(flagKey => 
+          issue.flags![flagKey as keyof typeof issue.flags] === true
+        );
+      });
+    }
+    
+    return issues;
+  }, [sprintData, selectedSubCategories, selectedFlags]);
+
+  // Create filtered sprint data for the table
+  const filteredSprintData = useMemo(() => {
+    if (!sprintData) return null;
+    return {
+      ...sprintData,
+      issues: filteredIssues
+    };
+  }, [sprintData, filteredIssues]);
 
   useEffect(() => {
     loadTeams();
@@ -92,7 +137,10 @@ const SprintsPage: React.FC = () => {
 
       // Get current sprint data (use 'name' since user enters sprint name)
       const currentSprint = await sprintApi.getSprintData(selectedTeam, sprintIdentifier, 'name');
-      setSprintData(currentSprint);
+      
+      // Apply issue flags to the sprint data
+      const currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint);
+      setSprintData(currentSprintWithFlags);
 
       // Get historical data if requested - make parallel calls for each historical sprint
       let historicalSprints: SprintData[] = [];
@@ -106,10 +154,12 @@ const SprintsPage: React.FC = () => {
         });
 
         const results = await Promise.all(historicalPromises);
-        historicalSprints = results.filter((s): s is SprintData => s !== null);
+        historicalSprints = results
+          .filter((s): s is SprintData => s !== null)
+          .map(sprint => applyIssueFlagsToSprintData(sprint));
       }
 
-      setHistoricalData(historicalSprints.length > 0 ? { currentSprint, historicalSprints } : null);
+      setHistoricalData(historicalSprints.length > 0 ? { currentSprint: currentSprintWithFlags, historicalSprints } : null);
 
       // Get LLM analysis
       const analysis = await llmApi.analyzeSprint(currentSprint, historicalSprints);
@@ -127,12 +177,35 @@ const SprintsPage: React.FC = () => {
     setTabValue(newValue);
   };
 
+  const handleSubCategoryToggle = (subCategory: string) => {
+    setSelectedSubCategories(prev => 
+      prev.includes(subCategory)
+        ? prev.filter(c => c !== subCategory)
+        : [...prev, subCategory]
+    );
+  };
+
+  const handleClearFilters = () => {
+    setSelectedSubCategories([]);
+    setSelectedFlags([]);
+  };
+
+  const handleFlagToggle = (flagKey: string) => {
+    setSelectedFlags(prev => 
+      prev.includes(flagKey)
+        ? prev.filter(f => f !== flagKey)
+        : [...prev, flagKey]
+    );
+  };
+
+  // Reset filters when sprint data changes
+  useEffect(() => {
+    setSelectedSubCategories([]);
+    setSelectedFlags([]);
+  }, [sprintData]);
+
   return (
     <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Sprint Analysis
-      </Typography>
-
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={3} alignItems="center">
@@ -197,7 +270,6 @@ const SprintsPage: React.FC = () => {
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs value={tabValue} onChange={handleTabChange}>
                   <Tab label="Sprint" icon={<InfoIcon />} />
-                  <Tab label="Issues" icon={<AnalyticsIcon />} />
                   <Tab label="Analysis" icon={<ChatIcon />} />
                   <Tab label="Trends" icon={<AnalyticsIcon />} />
                 </Tabs>
@@ -216,7 +288,7 @@ const SprintsPage: React.FC = () => {
                     The data is cached daily and may not reflect real-time updates.
                   </Alert>
                 )}
-                <Card>
+                <Card sx={{ mb: 2 }}>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
                       Sprint Information
@@ -243,13 +315,68 @@ const SprintsPage: React.FC = () => {
                     </Box>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardContent>
+                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="h6">
+                        Issues {(selectedSubCategories.length > 0 || selectedFlags.length > 0) && `(${filteredIssues.length} of ${sprintData.issues.length})`}
+                      </Typography>
+                      {(selectedSubCategories.length > 0 || selectedFlags.length > 0) && (
+                        <Button size="small" onClick={handleClearFilters}>
+                          Clear Filters
+                        </Button>
+                      )}
+                    </Box>
+                    
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      {/* Flag Filters */}
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Filter by Flags:
+                        </Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {FLAG_FILTERS.map((flag) => (
+                            <Chip
+                              key={flag.key}
+                              label={flag.label}
+                              onClick={() => handleFlagToggle(flag.key)}
+                              color={selectedFlags.includes(flag.key) ? 'secondary' : 'default'}
+                              variant={selectedFlags.includes(flag.key) ? 'filled' : 'outlined'}
+                              sx={{ mb: 1 }}
+                            />
+                          ))}
+                        </Stack>
+                      </Grid>
+
+                      {/* Sub-Category Filters */}
+                      {subCategories.length > 0 && (
+                        <Grid item xs={12}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Filter by Sub-Category:
+                          </Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                            {subCategories.map(category => (
+                              <Chip
+                                key={category}
+                                label={category}
+                                onClick={() => handleSubCategoryToggle(category)}
+                                color={selectedSubCategories.includes(category) ? 'primary' : 'default'}
+                                variant={selectedSubCategories.includes(category) ? 'filled' : 'outlined'}
+                                sx={{ mb: 1 }}
+                              />
+                            ))}
+                          </Stack>
+                        </Grid>
+                      )}
+                    </Grid>
+                    
+                    {filteredSprintData && <SprintIssuesTable sprintData={filteredSprintData} />}
+                  </CardContent>
+                </Card>
               </TabPanel>
 
               <TabPanel value={tabValue} index={1}>
-                <SprintIssuesTable sprintData={sprintData} />
-              </TabPanel>
-
-              <TabPanel value={tabValue} index={2}>
                 <SprintAnalysis 
                   sprintData={sprintData} 
                   llmAnalysis={llmAnalysis}
@@ -257,7 +384,7 @@ const SprintsPage: React.FC = () => {
                 />
               </TabPanel>
 
-              <TabPanel value={tabValue} index={3}>
+              <TabPanel value={tabValue} index={2}>
                 <SprintTrends 
                   currentSprint={sprintData}
                   historicalSprints={historicalData?.historicalSprints || []}
