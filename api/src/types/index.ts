@@ -38,6 +38,8 @@ export interface Issue {
   storyPoints: number;
   subCategory: string;
   history: IssueHistory[];
+  workStartedAt?: Date;  // When work actually began (moved out of first column)
+  completedAt?: Date;     // When work was completed (moved to last column)
 }
 
 export interface Build {

@@ -13,6 +13,7 @@ export interface IssueFlags {
   isNotStarted: boolean;
   isBackAndForth: boolean;
   isUnplanned: boolean;
+  isInherited: boolean;
   isSpillover: boolean;
   isCompleted: boolean;
   isClosed: boolean;
@@ -75,6 +76,34 @@ export function isIssueUnplanned(issue: Issue, sprintData: SprintData): boolean 
   const sprintStart = new Date(sprintData.sprint.start);
   const sprintEnd = new Date(sprintData.sprint.end);
   return createdDate >= sprintStart && createdDate <= sprintEnd;
+}
+
+
+/**
+ * Determines if an issue was inherited from the previous sprint
+ * An issue is inherited if:
+ * 1. It was created before this sprint started, AND
+ * 2. The first move in this sprint is NOT from the first column (meaning it was already in progress)
+ */
+export function isIssueInherited(issue: Issue, sprintData: SprintData): boolean {
+  const createdDate = new Date(issue.created);
+  const sprintStart = new Date(sprintData.sprint.start);
+  
+  // If issue was created during or after this sprint, it's not inherited
+  if (createdDate >= sprintStart) {
+    return false;
+  }
+  
+  // Issue was created before this sprint
+  // If there are no moves in this sprint, including boundary, it is a planned issue
+  if (issue.history.length === 0) {
+    return false;
+  }
+  
+  // Check the first event in sprint - if it's from a non-first column, it's inherited
+  const historiesInSprint = getHistoriesInSprint(issue, true);
+  const firstEventInSprint = historiesInSprint[0];
+  return historiesInSprint.length > 0 && firstEventInSprint.fromString.toLowerCase() !== sprintData.columns[0].name.toLowerCase();
 }
 
 /**
@@ -151,6 +180,7 @@ export function calculateIssueFlags(issue: Issue, sprintData: SprintData): Issue
     isNotStarted: isIssueNotStarted(issue, sprintData),
     isBackAndForth: isIssueBackAndForth(issue, sprintData),
     isUnplanned: isIssueUnplanned(issue, sprintData),
+    isInherited: isIssueInherited(issue, sprintData),
     isSpillover: isIssueSpillover(issue, sprintData),
     isCompleted: isIssueCompleted(issue, sprintData),
     isClosed: isIssueClosed(issue, sprintData)
@@ -179,6 +209,7 @@ export const FLAG_FILTERS = [
   { key: 'isNotStarted', label: 'Not Started' },
   { key: 'isBackAndForth', label: 'Back-and-forth' },
   { key: 'isUnplanned', label: 'Unplanned' },
+  { key: 'isInherited', label: 'Inherited' },
   { key: 'isSpillover', label: 'Spillover' },
   { key: 'isCompleted', label: 'Completed' },
   { key: 'isClosed', label: 'Closed' }

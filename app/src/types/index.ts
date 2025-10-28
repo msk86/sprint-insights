@@ -36,6 +36,7 @@ export interface IssueFlags {
   isNotStarted: boolean;
   isBackAndForth: boolean;
   isUnplanned: boolean;
+  isInherited: boolean;
   isSpillover: boolean;
   isCompleted: boolean;
   isClosed: boolean;
@@ -50,6 +51,8 @@ export interface Issue {
   subCategory: string;
   history: IssueHistory[];
   flags?: IssueFlags;
+  workStartedAt?: Date;  // When work actually began (moved out of first column)
+  completedAt?: Date;     // When work was completed (moved to last column)
 }
 
 export interface Build {

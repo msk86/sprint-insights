@@ -56,17 +56,23 @@ export class JiraService {
     }));
   }
 
-  private normaliseIssueHistory(data: any): IssueHistory[] {
+  private normaliseIssueHistory(data: any, statusColumnMapping: Record<string, string>): IssueHistory[] {
     return data.values
       .filter((v: any) => v.items.find((i: any) => i.field === "status"))
-      .map((v: any) => v.items.filter((i: any) => i.field === "status").map((i: any) => ({
-        status: i.toString,
-        statusId: i.to,  // Status ID for mapping to board columns
-        fromString: i.fromString,
-        fromStatusId: i.from,  // Previous status ID
-        toString: i.toString,
-        at: new Date(v.created)
-      })))
+      .map((v: any) => v.items.filter((i: any) => i.field === "status").map((i: any) => {
+        // Map status IDs to column names immediately
+        const toColumn = statusColumnMapping[i.to] || i.toString;
+        const fromColumn = statusColumnMapping[i.from] || i.fromString;
+        
+        return {
+          status: toColumn,  // Use column name
+          statusId: i.to,    // Keep status ID for reference
+          fromString: fromColumn,  // Use column name
+          fromStatusId: i.from,    // Keep status ID for reference
+          toString: toColumn,      // Use column name
+          at: new Date(v.created)
+        };
+      }))
       .flat();
   }
 
@@ -152,16 +158,16 @@ export class JiraService {
     };
   }
 
+
   /**
    * Filter issue history to only include events within sprint boundaries
    * and add boundary events for issues that were already in progress.
-   * Maps status IDs to board column names using statusColumnMapping.
+   * Note: toString already contains column names (mapped during normalizeIssueHistory).
    */
   private filterHistoryToSprint(
     allHistory: IssueHistory[], 
     sprintStart: Date, 
-    sprintEnd: Date,
-    statusColumnMapping: Record<string, string>
+    sprintEnd: Date
   ): IssueHistory[] {
     // Get histories within sprint time boundary
     const historiesInSprint = allHistory.filter(h => 
@@ -178,70 +184,59 @@ export class JiraService {
       .filter(h => h.at > sprintEnd)
       .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
 
-    // Helper function to map status to column name
-    const mapToColumn = (history: IssueHistory): string => {
-      // Use statusColumnMapping if statusId is available, otherwise fall back to status name
-      return (history.statusId && statusColumnMapping[history.statusId]) || history.toString;
-    };
-
     // Build timeline with sprint boundaries
     const timelineEvents: IssueHistory[] = [];
 
     // Add boundary event at sprint start if issue was already in a status before sprint
     if (lastEventBeforeSprint) {
-      const columnName = mapToColumn(lastEventBeforeSprint);
       timelineEvents.push({
         inSprint: false,
-        status: columnName,  // Use column name instead of status
+        status: lastEventBeforeSprint.toString,
         statusId: lastEventBeforeSprint.statusId,
         fromString: lastEventBeforeSprint.fromString,
         fromStatusId: lastEventBeforeSprint.fromStatusId,
-        toString: columnName,  // Use column name instead of status
+        toString: lastEventBeforeSprint.toString,
         at: sprintStart
       });
     }
 
-    // Add all events that happened during the sprint, mapping statuses to columns
+    // Add all events that happened during the sprint
     timelineEvents.push(...historiesInSprint.map(h => ({
       ...h,
-      inSprint: true,
-      status: mapToColumn(h),
-      toString: mapToColumn(h)
+      inSprint: true
     })));
 
     // Add boundary event at sprint end if issue was still in progress
     // (either there's an event after sprint, or last event in sprint is not a completed status)
     if (firstEventAfterSprint) {
-      const columnName = mapToColumn(firstEventAfterSprint);
       const previousColumn = historiesInSprint.length > 0 
-        ? mapToColumn(historiesInSprint[historiesInSprint.length - 1])
-        : (lastEventBeforeSprint ? mapToColumn(lastEventBeforeSprint) : '');
+        ? historiesInSprint[historiesInSprint.length - 1].toString
+        : (lastEventBeforeSprint ? lastEventBeforeSprint.toString : '');
       
       timelineEvents.push({
         inSprint: false,
-        status: columnName,
+        status: firstEventAfterSprint.toString,
         statusId: firstEventAfterSprint.statusId,
         fromString: previousColumn,
         fromStatusId: historiesInSprint.length > 0 
           ? historiesInSprint[historiesInSprint.length - 1].statusId
           : lastEventBeforeSprint?.statusId,
-        toString: columnName,
+        toString: firstEventAfterSprint.toString,
         at: sprintEnd
       });
     } else if (historiesInSprint.length > 0) {
       const lastEvent = historiesInSprint[historiesInSprint.length - 1];
-      const lastColumn = mapToColumn(lastEvent);
       const isCompleted = this.issueStatuses.END_STATUSES.some(s => lastEvent.toString.toLowerCase() === s);
       
       if (!isCompleted) {
         // Issue was still in progress at sprint end
         timelineEvents.push({
           inSprint: false,
-          status: lastColumn,
+          status: lastEvent.toString,
           statusId: lastEvent.statusId,
-          fromString: lastColumn,
+          fromString: lastEvent.toString,
           fromStatusId: lastEvent.statusId,
-          toString: lastColumn,
+          toString: lastEvent.toString,
           at: sprintEnd
         });
       }
@@ -250,7 +245,7 @@ export class JiraService {
     return timelineEvents;
   }
 
-  async getSprintIssues(sprintIndex: number, statusColumnMapping: Record<string, string>): Promise<{ sprint: SprintMeta; issues: Issue[] }> {
+  async getSprintIssues(sprintIndex: number, columns: SprintColumn[], statusColumnMapping: Record<string, string>): Promise<{ sprint: SprintMeta; issues: Issue[] }> {
     const sprintMeta = await this.getSprint(this.teamConfig.JIRA_BOARD_ID, sprintIndex);
     const jqlQuery = `project=${this.teamConfig.JIRA_PROJECT} AND Sprint in ("${sprintMeta.name}")`;
     
@@ -278,20 +273,57 @@ export class JiraService {
       issues: normalizedData
     };
     
-    // Fetch histories for all issues and filter to sprint boundaries
+    const firstColumnName = columns[0].name;
+    const lastColumnName = columns[columns.length - 1].name;
+    
+    // Fetch histories for all issues and calculate timestamps
     for (const issue of sprintData.issues) {
-      const allHistory = await this.getIssueHistory(issue.key);
-      issue.history = this.filterHistoryToSprint(allHistory, sprintMeta.start, sprintMeta.end, statusColumnMapping);
+      const allHistory = await this.getIssueHistory(issue.key, statusColumnMapping);
+      
+      // Calculate work timestamps from full history
+      // Note: toString already contains column names (mapped during normalizeIssueHistory)
+      let workStartedAt: Date | undefined;
+      let completedAt: Date | undefined;
+
+      if (allHistory.length > 0) {
+        // Find when work started (moved out of first column)
+        for (const event of allHistory) {
+          if (event.fromString === firstColumnName) {
+            workStartedAt = event.at;
+            break;
+          }
+        }
+
+        // If no move out of first column was found, check if issue was created in a non-first column
+        if (workStartedAt && allHistory[0].fromString !== firstColumnName) {
+          // Issue was created directly in a non-first column, use creation time
+          workStartedAt = issue.created;
+        }
+
+        // Find when work completed (moved to last column)
+        for (const event of allHistory) {
+          if (event.toString === lastColumnName) {
+            completedAt = event.at;
+            // Don't break - keep looking for the last time it moved to the last column
+          }
+        }
+      }
+
+      issue.workStartedAt = workStartedAt;
+      issue.completedAt = completedAt;
+      
+      // Filter history to sprint boundaries
+      issue.history = this.filterHistoryToSprint(allHistory, sprintMeta.start, sprintMeta.end);
     }
     
     return sprintData;
   }
 
-  async getIssueHistory(issueKey: string): Promise<IssueHistory[]> {
+  async getIssueHistory(issueKey: string, statusColumnMapping: Record<string, string>): Promise<IssueHistory[]> {
     const data = await this.makeJiraApiRequest(
       `${this.baseUrl}/rest/api/3/issue/${issueKey}/changelog`
     );
-    return this.normaliseIssueHistory(data);
+    return this.normaliseIssueHistory(data, statusColumnMapping);
   }
 
   /**
@@ -341,7 +373,7 @@ export class JiraService {
     const boardColumnsData = await this.getBoardColumns(this.teamConfig.JIRA_BOARD_ID);
     
     // Get sprint issues with filtered history (using status-to-column mapping)
-    const sprintData = await this.getSprintIssues(sprintIndex, boardColumnsData.statusColumnMapping);
+    const sprintData = await this.getSprintIssues(sprintIndex, boardColumnsData.columns, boardColumnsData.statusColumnMapping);
 
     return {
       sprint: sprintData.sprint,

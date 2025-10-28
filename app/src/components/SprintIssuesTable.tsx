@@ -48,6 +48,8 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
       const notes: string[] = [];
       if (issue.flags?.isBlocked) notes.push('Blocked');
       if (issue.flags?.isUnplanned) notes.push('Unplanned');
+      if (issue.flags?.isInherited) notes.push('Inherited');
+      if (issue.flags?.isSpillover) notes.push('Spillover');
       if (issue.flags?.isNotStarted) notes.push('Not Started');
       if (issue.flags?.isBackAndForth) notes.push('Back-and-forth');
       
@@ -249,18 +251,55 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
                   <Typography variant="h6" gutterBottom>
                     Status History
                   </Typography>
-                  {selectedIssue.history
-                    .filter(history => history.inSprint)
-                    .map((history, index) => (
-                      <Box key={index} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  {selectedIssue.history.map((history, index) => {
+                    // Show boundary events only for inherited or spillover issues
+                    const showBoundaryEvents = selectedIssue.flags?.isInherited || selectedIssue.flags?.isSpillover;
+                    const isBoundaryEvent = !history.inSprint;
+                    
+                    // Skip non-sprint events unless it's a boundary event for inherited/spillover issues
+                    if (isBoundaryEvent && !showBoundaryEvents) {
+                      return null;
+                    }
+                    
+                    // Determine if this is a "before sprint" or "after sprint" boundary
+                    let boundaryLabel = '';
+                    if (isBoundaryEvent) {
+                      // First boundary event is "before sprint", last is "after sprint"
+                      const isFirstBoundary = index === 0;
+                      boundaryLabel = isFirstBoundary ? 'Before this sprint' : 'After this sprint';
+                    }
+                    
+                    return (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          mb: 1, 
+                          p: 1, 
+                          bgcolor: isBoundaryEvent ? 'warning.light' : 'grey.50',
+                          borderRadius: 1,
+                          border: isBoundaryEvent ? '1px dashed' : 'none',
+                          borderColor: isBoundaryEvent ? 'warning.main' : 'transparent'
+                        }}
+                      >
                         <Typography variant="body2">
-                          <strong>{history.fromString}</strong> → <strong>{history.toString}</strong>
+                          {history.fromString && (
+                            <strong>{history.fromString} → </strong>
+                          )}
+                          <strong>{history.toString}</strong>
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDateTime(history.at)}
-                        </Typography>
+                        {isBoundaryEvent && (
+                          <Typography variant="caption" color="warning.dark">
+                            ({boundaryLabel})
+                          </Typography>
+                        )}
+                        {!isBoundaryEvent && (
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDateTime(history.at)}
+                          </Typography>
+                        )}
                       </Box>
-                    ))}
+                    );
+                  })}
                 </Box>
               )}
             </Box>
