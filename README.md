@@ -204,6 +204,34 @@ cd app && npm test
 - Write unit tests
 - Use semantic commit messages
 
+## Maintenance
+
+### Cleaning Sprint Data Cache
+
+Sprint data is cached in S3 to improve performance. To clear the cache:
+
+**For Local Development:**
+```bash
+./scripts/clean-cache.sh local
+```
+
+**For Production:**
+```bash
+./scripts/clean-cache.sh production
+```
+
+The script will:
+- List all cached sprint data files
+- Delete them from S3
+- Verify the cache is empty
+- For production, it will ask for confirmation before deleting
+
+**When to clean the cache:**
+- After updating sprint data calculation logic
+- When testing with fresh data
+- If cached data appears stale or corrupted
+- After changing team configurations
+
 ## Troubleshooting
 
 ### Common Issues

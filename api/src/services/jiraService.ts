@@ -295,7 +295,7 @@ export class JiraService {
         }
 
         // If no move out of first column was found, check if issue was created in a non-first column
-        if (workStartedAt && allHistory[0].fromString !== firstColumnName) {
+        if (!workStartedAt && allHistory[0].fromString !== firstColumnName) {
           // Issue was created directly in a non-first column, use creation time
           workStartedAt = issue.created;
         }

@@ -4,12 +4,12 @@ import { LLMService } from '../services/llmService';
 
 export class LLMController {
   async analyzeSprint(req: Request, res: Response): Promise<void> {
-    return res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
         historicalData: req.body.historicalData,
-        analysisType: 'sprint_analysis'
+        analysisType: 'sprint_analysis',
+        stats: req.body.stats
       };
 
       const llmService = new LLMService();
@@ -22,12 +22,12 @@ export class LLMController {
   }
 
   async freeChat(req: Request, res: Response): Promise<void> {
-    return res.json({});
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
         userMessage: req.body.userMessage,
-        analysisType: 'free_chat'
+        analysisType: 'free_chat',
+        stats: req.body.stats
       };
 
       const llmService = new LLMService();

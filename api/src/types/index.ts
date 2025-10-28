@@ -30,6 +30,17 @@ export interface IssueHistory {
   at: Date;
 }
 
+export interface IssueFlags {
+  isBlocked: boolean;
+  isIncidentResponse: boolean;
+  isBackAndForth: boolean;
+  isUnplanned: boolean;
+  isInherited: boolean;
+  isSpillover: boolean;
+  isCompleted: boolean;
+  isClosed: boolean;
+}
+
 export interface Issue {
   id: string;
   key: string;
@@ -40,6 +51,7 @@ export interface Issue {
   history: IssueHistory[];
   workStartedAt?: Date;  // When work actually began (moved out of first column)
   completedAt?: Date;     // When work was completed (moved to last column)
+  flags?: IssueFlags;
 }
 
 export interface Build {
@@ -93,6 +105,23 @@ export interface LLMAnalysisRequest {
   historicalData?: SprintData[];
   analysisType: 'sprint_analysis' | 'free_chat';
   userMessage?: string;
+  stats?: {
+    totalIssues: number;
+    totalPoints: number;
+    completedIssues: number;
+    completedPoints: number;
+    backAndForthIssues: number;
+    incidentIssues: number;
+    totalBuilds: number;
+    totalReleases: number;
+    successfulBuilds: number;
+    successfulReleases: number;
+    avgBuildDuration: number;
+    deploymentFrequency: number;
+    medianLeadTime: number;
+    changeFailureRate: number;
+    medianMTTR: number;
+  };
 }
 
 export interface LLMAnalysisResponse {

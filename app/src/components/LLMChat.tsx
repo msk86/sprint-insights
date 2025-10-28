@@ -15,6 +15,7 @@ import { Send as SendIcon } from '@mui/icons-material';
 import { SprintData, LLMAnalysisResponse } from '../types';
 import { llmApi } from '../services/api';
 import { formatTime } from '../utils/dateFormat';
+import { calculateSprintStats, calculateDoraMetrics } from '../services/stats';
 
 interface ChatMessage {
   id: string;
@@ -58,7 +59,31 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
     setError(null);
 
     try {
-      const response = await llmApi.freeChat(sprintData, inputMessage);
+      // Calculate stats for LLM context
+      const sprintStats = calculateSprintStats(sprintData);
+      const doraMetrics = calculateDoraMetrics(sprintData);
+      
+      const stats = {
+        totalIssues: sprintData.issues.length,
+        totalPoints: sprintData.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+        completedIssues: sprintStats.throughput,
+        completedPoints: sprintStats.velocity,
+        backAndForthIssues: sprintData.issues.filter(issue => issue.flags?.isBackAndForth).length,
+        incidentIssues: sprintData.issues.filter(issue => issue.flags?.isIncidentResponse).length,
+        totalBuilds: sprintData.builds.length,
+        totalReleases: sprintData.builds.filter(b => b.isRelease).length,
+        successfulBuilds: sprintData.builds.filter(b => b.status === 'passed').length,
+        successfulReleases: sprintData.builds.filter(b => b.isRelease && b.status === 'passed').length,
+        avgBuildDuration: sprintData.builds.length > 0 
+          ? sprintData.builds.reduce((sum, b) => sum + b.duration, 0) / sprintData.builds.length / 60
+          : 0,
+        deploymentFrequency: doraMetrics.deploymentFrequency,
+        medianLeadTime: doraMetrics.avgLeadTime,
+        changeFailureRate: doraMetrics.changeFailureRate,
+        medianMTTR: doraMetrics.mttr,
+      };
+
+      const response = await llmApi.freeChat(sprintData, inputMessage, stats);
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),

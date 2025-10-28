@@ -57,18 +57,28 @@ export const sprintApi = {
 
 // LLM analysis API
 export const llmApi = {
-  analyzeSprint: async (sprintData: SprintData, historicalData?: SprintData[]): Promise<LLMAnalysisResponse> => {
+  analyzeSprint: async (
+    sprintData: SprintData, 
+    historicalData?: SprintData[], 
+    stats?: any
+  ): Promise<LLMAnalysisResponse> => {
     const response = await api.post('/llm/analyze', {
       sprintData,
-      historicalData
+      historicalData,
+      stats
     });
     return response.data;
   },
 
-  freeChat: async (sprintData: SprintData, userMessage: string): Promise<LLMAnalysisResponse> => {
+  freeChat: async (
+    sprintData: SprintData, 
+    userMessage: string,
+    stats?: any
+  ): Promise<LLMAnalysisResponse> => {
     const response = await api.post('/llm/chat', {
       sprintData,
-      userMessage
+      userMessage,
+      stats
     });
     return response.data;
   }

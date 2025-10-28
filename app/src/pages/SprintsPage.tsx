@@ -40,6 +40,7 @@ import SprintReleases from '../components/SprintReleases';
 import LLMChat from '../components/LLMChat';
 import { formatDate, formatDateRange } from '../utils/dateFormat';
 import { applyIssueFlagsToSprintData, FLAG_FILTERS } from '../services/issue';
+import { calculateSprintStats, calculateDoraMetrics } from '../services/stats';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -168,8 +169,32 @@ const SprintsPage: React.FC = () => {
 
       setHistoricalData(historicalSprints.length > 0 ? { currentSprint: currentSprintWithFlags, historicalSprints } : null);
 
+      // Calculate stats for LLM context
+      const sprintStats = calculateSprintStats(currentSprintWithFlags);
+      const doraMetrics = calculateDoraMetrics(currentSprintWithFlags);
+      
+      const stats = {
+        totalIssues: currentSprintWithFlags.issues.length,
+        totalPoints: currentSprintWithFlags.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+        completedIssues: sprintStats.throughput,
+        completedPoints: sprintStats.velocity,
+        backAndForthIssues: currentSprintWithFlags.issues.filter(issue => issue.flags?.isBackAndForth).length,
+        incidentIssues: currentSprintWithFlags.issues.filter(issue => issue.flags?.isIncidentResponse).length,
+        totalBuilds: currentSprintWithFlags.builds.length,
+        totalReleases: currentSprintWithFlags.builds.filter(b => b.isRelease).length,
+        successfulBuilds: currentSprintWithFlags.builds.filter(b => b.status === 'passed').length,
+        successfulReleases: currentSprintWithFlags.builds.filter(b => b.isRelease && b.status === 'passed').length,
+        avgBuildDuration: currentSprintWithFlags.builds.length > 0 
+          ? currentSprintWithFlags.builds.reduce((sum, b) => sum + b.duration, 0) / currentSprintWithFlags.builds.length / 60
+          : 0,
+        deploymentFrequency: doraMetrics.deploymentFrequency,
+        medianLeadTime: doraMetrics.avgLeadTime,
+        changeFailureRate: doraMetrics.changeFailureRate,
+        medianMTTR: doraMetrics.mttr,
+      };
+
       // Get LLM analysis
-      const analysis = await llmApi.analyzeSprint(currentSprint, historicalSprints);
+      const analysis = await llmApi.analyzeSprint(currentSprintWithFlags, historicalSprints, stats);
       setLlmAnalysis(analysis);
 
     } catch (err) {
