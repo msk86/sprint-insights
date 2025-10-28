@@ -9,7 +9,8 @@ export class LLMController {
         sprintData: req.body.sprintData,
         historicalData: req.body.historicalData,
         analysisType: 'sprint_analysis',
-        stats: req.body.stats
+        stats: req.body.stats,
+        historicalStats: req.body.historicalStats
       };
 
       const llmService = new LLMService();
@@ -25,9 +26,12 @@ export class LLMController {
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
+        historicalData: req.body.historicalData,
         userMessage: req.body.userMessage,
         analysisType: 'free_chat',
-        stats: req.body.stats
+        stats: req.body.stats,
+        chatHistory: req.body.chatHistory,
+        historicalStats: req.body.historicalStats
       };
 
       const llmService = new LLMService();

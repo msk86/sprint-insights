@@ -14,7 +14,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 import { SprintData, Issue } from '../types';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
-import { formatDays } from '../utils/timeCalculation';
+import { formatDays, calculateBusinessDays } from '../utils/timeCalculation';
 import { calculateIssueTimeSpentOnColumns } from '../services/issue';
 
 interface SprintIssuesTableProps {
@@ -23,6 +23,7 @@ interface SprintIssuesTableProps {
 
 interface EnrichedIssue extends Issue {
   timeSpent: Record<string, number>;
+  wipDuration: number;
   completion: string;
   notes: string;
 }
@@ -35,6 +36,13 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
   const enrichedIssues: EnrichedIssue[] = useMemo(() => {
     return sprintData.issues.map(issue => {
       const timeSpent = calculateIssueTimeSpentOnColumns(issue, sprintData);
+      
+      // Calculate WIP duration (from workStartedAt to completedAt or now)
+      let wipDuration = 0;
+      if (issue.workStartedAt) {
+        const endTime = issue.completedAt || new Date();
+        wipDuration = calculateBusinessDays(new Date(issue.workStartedAt), endTime);
+      }
       
       // Determine completion status
       let completion = 'No';
@@ -55,6 +63,7 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
       return {
         ...issue,
         timeSpent,
+        wipDuration,
         completion,
         notes: notes.join(', ') || '-'
       };
@@ -97,6 +106,22 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
         type: 'number',
         align: 'center',
         headerAlign: 'center',
+      },
+      {
+        field: 'wipDuration',
+        headerName: 'WIP Duration',
+        width: 120,
+        type: 'number',
+        align: 'center',
+        headerAlign: 'center',
+        renderCell: (params) => {
+          const issue = params.row as EnrichedIssue;
+          return (
+            <Typography variant="body2">
+              {formatDays(issue.wipDuration)}
+            </Typography>
+          );
+        },
       },
       {
         field: 'subCategory',

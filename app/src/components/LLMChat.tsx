@@ -7,15 +7,15 @@ import {
   Paper,
   List,
   ListItem,
-  ListItemText,
   CircularProgress,
   Alert,
 } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
-import { SprintData, LLMAnalysisResponse } from '../types';
+import { SprintData } from '../types';
 import { llmApi } from '../services/api';
 import { formatTime } from '../utils/dateFormat';
 import { calculateSprintStats, calculateDoraMetrics } from '../services/stats';
+import { calculateBuildSummaryByPipeline } from '../utils/buildStats';
 
 interface ChatMessage {
   id: string;
@@ -26,9 +26,11 @@ interface ChatMessage {
 
 interface LLMChatProps {
   sprintData: SprintData;
+  historicalData?: SprintData[];
+  historicalStats?: any[];
 }
 
-const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
+const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historicalStats }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,6 +65,9 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
       const sprintStats = calculateSprintStats(sprintData);
       const doraMetrics = calculateDoraMetrics(sprintData);
       
+      // Calculate build/release summary per pipeline
+      const buildSummaryByPipeline = calculateBuildSummaryByPipeline(sprintData.builds);
+      
       const stats = {
         totalIssues: sprintData.issues.length,
         totalPoints: sprintData.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
@@ -81,9 +86,27 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
         medianLeadTime: doraMetrics.avgLeadTime,
         changeFailureRate: doraMetrics.changeFailureRate,
         medianMTTR: doraMetrics.mttr,
+        buildSummaryByPipeline,
       };
 
-      const response = await llmApi.freeChat(sprintData, inputMessage, stats);
+      // Prepare sprint data without builds for LLM
+      const sprintDataForLLM = { ...sprintData, builds: [] };
+      const historicalDataForLLM = historicalData?.map(sprint => ({ ...sprint, builds: [] }));
+
+      // Prepare chat history (exclude the current message that was just added)
+      const chatHistory = messages.map(msg => ({
+        role: msg.type,
+        content: msg.content
+      }));
+
+      const response = await llmApi.freeChat(
+        sprintDataForLLM, 
+        inputMessage, 
+        stats, 
+        chatHistory,
+        historicalDataForLLM,
+        historicalStats
+      );
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),

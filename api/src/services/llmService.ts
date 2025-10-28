@@ -24,12 +24,12 @@ export class LLMService {
 
   async freeChat(request: LLMAnalysisRequest): Promise<LLMAnalysisResponse> {
     const prompt = this.buildFreeChatPrompt(request);
-    const response = await this.invokeModel(prompt);
+    const response = await this.invokeModelWithHistory(prompt, request.chatHistory);
     return this.parseAnalysisResponse(response);
   }
 
   private buildSprintAnalysisPrompt(request: LLMAnalysisRequest): string {
-    const { sprintData, historicalData, stats } = request;
+    const { sprintData, historicalData, stats, historicalStats } = request;
     
     // Use provided stats from frontend if available, otherwise calculate
     const totalIssues = stats?.totalIssues ?? sprintData.issues.length;
@@ -74,6 +74,16 @@ BUILD & RELEASE STATISTICS:
 - Total Builds: ${totalBuilds} (${successfulBuilds} successful = ${buildSuccessRate}%)
 - Total Releases: ${totalReleases} (${successfulReleases} successful = ${releaseSuccessRate}%)
 - Average Build Duration: ${avgBuildDuration.toFixed(1)} minutes
+${stats?.buildSummaryByPipeline && stats.buildSummaryByPipeline.length > 0 ? `
+BUILD & RELEASE BY PIPELINE:
+${stats.buildSummaryByPipeline.map(pipeline => {
+  const pipelineBuildSuccessRate = pipeline.totalBuilds > 0 ? ((pipeline.successfulBuilds / pipeline.totalBuilds) * 100).toFixed(1) : '0';
+  const pipelineReleaseSuccessRate = pipeline.totalReleases > 0 ? ((pipeline.successfulReleases / pipeline.totalReleases) * 100).toFixed(1) : '0';
+  return `- ${pipeline.pipelineName} (${pipeline.repository}):
+  Builds: ${pipeline.totalBuilds} (${pipeline.successfulBuilds} successful = ${pipelineBuildSuccessRate}%)
+  Releases: ${pipeline.totalReleases} (${pipeline.successfulReleases} successful = ${pipelineReleaseSuccessRate}%)
+  Avg Duration: ${pipeline.avgBuildDuration.toFixed(1)} min`;
+}).join('\n')}` : ''}
 
 DORA METRICS:
 - Deployment Frequency: ${deploymentFrequency.toFixed(2)} releases/day
@@ -110,35 +120,33 @@ ${sprintData.columns.map(col => col.name).join(' → ')}`;
       return `[${issue.key}] ${issue.summary}
   Points: ${issue.storyPoints} | Category: ${issue.subCategory || 'None'}${flagsText}
   Created: ${createdDate} | Started: ${startedDate} | Completed: ${completedDate}
-  Flow: ${flow}`;
+  Flow: ${flow} (NOTE: Flow shows only status changes within the sprint)`;
     }).join('\n\n');
     
-    // Build historical context as formatted text
-    const historicalContext = historicalData && historicalData.length > 0 ? historicalData.map(sprint => {
-      const historicalLastColumn = sprint.columns.length > 0 
-        ? sprint.columns[sprint.columns.length - 1].name 
-        : '';
+    // Build historical context using historicalStats
+    const historicalContext = historicalStats && historicalStats.length > 0 ? historicalStats.map(hist => {
+      const completionRate = hist.totalIssues > 0 ? ((hist.completedIssues / hist.totalIssues) * 100).toFixed(1) : '0';
+      const buildSuccessRate = hist.totalBuilds > 0 ? ((hist.successfulBuilds / hist.totalBuilds) * 100).toFixed(1) : '0';
+      const releaseSuccessRate = hist.totalReleases > 0 ? ((hist.successfulReleases / hist.totalReleases) * 100).toFixed(1) : '0';
       
-      const historicalCompletedIssues = sprint.issues.filter(issue => {
-        const lastHistory = issue.history.length > 0 
-          ? issue.history[issue.history.length - 1] 
-          : null;
-        return lastHistory && lastHistory.toString === historicalLastColumn && lastHistory.inSprint;
-      }).length;
+      let sprintSummary = `Sprint ${hist.sprintIndex} (${hist.sprintName}):
+  - Issues: ${hist.totalIssues} (${hist.totalPoints} points) → ${hist.completedIssues} completed (${hist.completedPoints} points) = ${completionRate}% completion
+  - Builds: ${hist.totalBuilds} (${hist.successfulBuilds} successful = ${buildSuccessRate}%)
+  - Releases: ${hist.totalReleases} (${hist.successfulReleases} successful = ${releaseSuccessRate}%)
+  - DORA: DF=${hist.deploymentFrequency.toFixed(2)} releases/day, LT=${hist.medianLeadTime.toFixed(1)} days, CFR=${hist.changeFailureRate.toFixed(1)}%, MTTR=${hist.medianMTTR.toFixed(1)} hours`;
       
-      const historicalCompletedPoints = sprint.issues.filter(issue => {
-        const lastHistory = issue.history.length > 0 
-          ? issue.history[issue.history.length - 1] 
-          : null;
-        return lastHistory && lastHistory.toString === historicalLastColumn && lastHistory.inSprint;
-      }).reduce((sum, issue) => sum + issue.storyPoints, 0);
+      // Add build summary by pipeline if available
+      if (hist.buildSummaryByPipeline && hist.buildSummaryByPipeline.length > 0) {
+        sprintSummary += '\n  Build/Release by Pipeline:';
+        hist.buildSummaryByPipeline.forEach(pipeline => {
+          const pipelineBuildSuccessRate = pipeline.totalBuilds > 0 ? ((pipeline.successfulBuilds / pipeline.totalBuilds) * 100).toFixed(1) : '0';
+          const pipelineReleaseSuccessRate = pipeline.totalReleases > 0 ? ((pipeline.successfulReleases / pipeline.totalReleases) * 100).toFixed(1) : '0';
+          sprintSummary += `\n    - ${pipeline.pipelineName} (${pipeline.repository}): ${pipeline.totalBuilds} builds (${pipelineBuildSuccessRate}% success), ${pipeline.totalReleases} releases (${pipelineReleaseSuccessRate}% success), ${pipeline.avgBuildDuration.toFixed(1)} min avg`;
+        });
+      }
       
-      const histTotalIssues = sprint.issues.length;
-      const histTotalPoints = sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0);
-      const histCompletionRate = histTotalIssues > 0 ? ((historicalCompletedIssues / histTotalIssues) * 100).toFixed(1) : '0';
-      
-      return `Sprint ${sprint.sprint.index} (${sprint.sprint.name}): ${histTotalIssues} issues (${histTotalPoints} points) → ${historicalCompletedIssues} completed (${historicalCompletedPoints} points) = ${histCompletionRate}% completion`;
-    }).join('\n') : 'No historical data available';
+      return sprintSummary;
+    }).join('\n\n') : 'No historical data available';
     
     let prompt = `You are an expert agile coach and sprint analyst. Analyze the following sprint data and provide insights and recommendations.
 
@@ -179,7 +187,12 @@ CRITICAL: Return ONLY the JSON object. Do not use markdown code blocks or any ot
   }
 
   private buildFreeChatPrompt(request: LLMAnalysisRequest): string {
-    const { sprintData, userMessage, stats } = request;
+    const { sprintData, userMessage, stats, chatHistory, historicalStats } = request;
+    
+    // If there's chat history, only send the user message (context was sent in first message)
+    if (chatHistory && chatHistory.length > 0) {
+      return userMessage || '';
+    }
     
     // Use provided stats from frontend if available, otherwise calculate
     const totalIssues = stats?.totalIssues ?? sprintData.issues.length;
@@ -222,6 +235,16 @@ BUILD & RELEASE STATISTICS:
 - Total Builds: ${totalBuilds} (${successfulBuilds} successful = ${buildSuccessRate}%)
 - Total Releases: ${totalReleases} (${successfulReleases} successful = ${releaseSuccessRate}%)
 - Average Build Duration: ${avgBuildDuration.toFixed(1)} minutes
+${stats?.buildSummaryByPipeline && stats.buildSummaryByPipeline.length > 0 ? `
+BUILD & RELEASE BY PIPELINE:
+${stats.buildSummaryByPipeline.map(pipeline => {
+  const pipelineBuildSuccessRate = pipeline.totalBuilds > 0 ? ((pipeline.successfulBuilds / pipeline.totalBuilds) * 100).toFixed(1) : '0';
+  const pipelineReleaseSuccessRate = pipeline.totalReleases > 0 ? ((pipeline.successfulReleases / pipeline.totalReleases) * 100).toFixed(1) : '0';
+  return `- ${pipeline.pipelineName} (${pipeline.repository}):
+  Builds: ${pipeline.totalBuilds} (${pipeline.successfulBuilds} successful = ${pipelineBuildSuccessRate}%)
+  Releases: ${pipeline.totalReleases} (${pipeline.successfulReleases} successful = ${pipelineReleaseSuccessRate}%)
+  Avg Duration: ${pipeline.avgBuildDuration.toFixed(1)} min`;
+}).join('\n')}` : ''}
 
 DORA METRICS:
 - Deployment Frequency: ${deploymentFrequency.toFixed(2)} releases/day
@@ -258,8 +281,33 @@ ${sprintData.columns.map(col => col.name).join(' → ')}`;
       return `[${issue.key}] ${issue.summary}
   Points: ${issue.storyPoints} | Category: ${issue.subCategory || 'None'}${flagsText}
   Created: ${createdDate} | Started: ${startedDate} | Completed: ${completedDate}
-  Flow: ${flow}`;
+  Flow: ${flow} (NOTE: Flow shows only status changes within the sprint)`;
     }).join('\n\n');
+    
+    // Build historical context using historicalStats
+    const historicalContext = historicalStats && historicalStats.length > 0 ? historicalStats.map(hist => {
+      const completionRate = hist.totalIssues > 0 ? ((hist.completedIssues / hist.totalIssues) * 100).toFixed(1) : '0';
+      const buildSuccessRate = hist.totalBuilds > 0 ? ((hist.successfulBuilds / hist.totalBuilds) * 100).toFixed(1) : '0';
+      const releaseSuccessRate = hist.totalReleases > 0 ? ((hist.successfulReleases / hist.totalReleases) * 100).toFixed(1) : '0';
+      
+      let sprintSummary = `Sprint ${hist.sprintIndex} (${hist.sprintName}):
+  - Issues: ${hist.totalIssues} (${hist.totalPoints} points) → ${hist.completedIssues} completed (${hist.completedPoints} points) = ${completionRate}% completion
+  - Builds: ${hist.totalBuilds} (${hist.successfulBuilds} successful = ${buildSuccessRate}%)
+  - Releases: ${hist.totalReleases} (${hist.successfulReleases} successful = ${releaseSuccessRate}%)
+  - DORA: DF=${hist.deploymentFrequency.toFixed(2)} releases/day, LT=${hist.medianLeadTime.toFixed(1)} days, CFR=${hist.changeFailureRate.toFixed(1)}%, MTTR=${hist.medianMTTR.toFixed(1)} hours`;
+      
+      // Add build summary by pipeline if available
+      if (hist.buildSummaryByPipeline && hist.buildSummaryByPipeline.length > 0) {
+        sprintSummary += '\n  Build/Release by Pipeline:';
+        hist.buildSummaryByPipeline.forEach(pipeline => {
+          const pipelineBuildSuccessRate = pipeline.totalBuilds > 0 ? ((pipeline.successfulBuilds / pipeline.totalBuilds) * 100).toFixed(1) : '0';
+          const pipelineReleaseSuccessRate = pipeline.totalReleases > 0 ? ((pipeline.successfulReleases / pipeline.totalReleases) * 100).toFixed(1) : '0';
+          sprintSummary += `\n    - ${pipeline.pipelineName} (${pipeline.repository}): ${pipeline.totalBuilds} builds (${pipelineBuildSuccessRate}% success), ${pipeline.totalReleases} releases (${pipelineReleaseSuccessRate}% success), ${pipeline.avgBuildDuration.toFixed(1)} min avg`;
+        });
+      }
+      
+      return sprintSummary;
+    }).join('\n\n') : 'No historical data available';
     
     let prompt = `You are an expert agile coach helping with sprint analysis. You have access to comprehensive sprint data.
 
@@ -267,6 +315,9 @@ ${sprintMetadata}
 
 ISSUES (${totalIssues} total):
 ${issuesFormatted}
+
+HISTORICAL TRENDS (for comparison):
+${historicalContext}
 
 User Question: ${userMessage}
 
@@ -300,6 +351,42 @@ CRITICAL: Return ONLY the JSON object. Do not use markdown code blocks or any ot
             content: prompt
           }
         ]
+      })
+    };
+
+    const command = new InvokeModelCommand(input);
+    const response = await this.client.send(command);
+    
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    return responseBody.content[0].text;
+  }
+
+  private async invokeModelWithHistory(
+    prompt: string, 
+    chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+  ): Promise<string> {
+    // Build messages array with chat history
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    
+    // Add previous chat history if available
+    if (chatHistory && chatHistory.length > 0) {
+      messages.push(...chatHistory);
+    }
+    
+    // Add the current user message with context
+    messages.push({
+      role: 'user',
+      content: prompt
+    });
+
+    const input = {
+      modelId: this.modelId,
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: JSON.stringify({
+        anthropic_version: 'bedrock-2023-05-31',
+        max_tokens: 4000,
+        messages
       })
     };
 

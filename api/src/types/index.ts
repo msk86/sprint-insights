@@ -105,6 +105,10 @@ export interface LLMAnalysisRequest {
   historicalData?: SprintData[];
   analysisType: 'sprint_analysis' | 'free_chat';
   userMessage?: string;
+  chatHistory?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
   stats?: {
     totalIssues: number;
     totalPoints: number;
@@ -121,7 +125,44 @@ export interface LLMAnalysisRequest {
     medianLeadTime: number;
     changeFailureRate: number;
     medianMTTR: number;
+    buildSummaryByPipeline?: Array<{
+      pipelineName: string;
+      repository: string;
+      totalBuilds: number;
+      successfulBuilds: number;
+      avgBuildDuration: number;
+      totalReleases: number;
+      successfulReleases: number;
+    }>;
   };
+  historicalStats?: Array<{
+    sprintIndex: number;
+    sprintName: string;
+    totalIssues: number;
+    totalPoints: number;
+    completedIssues: number;
+    completedPoints: number;
+    backAndForthIssues: number;
+    incidentIssues: number;
+    totalBuilds: number;
+    totalReleases: number;
+    successfulBuilds: number;
+    successfulReleases: number;
+    avgBuildDuration: number;
+    deploymentFrequency: number;
+    medianLeadTime: number;
+    changeFailureRate: number;
+    medianMTTR: number;
+    buildSummaryByPipeline?: Array<{
+      pipelineName: string;
+      repository: string;
+      totalBuilds: number;
+      successfulBuilds: number;
+      avgBuildDuration: number;
+      totalReleases: number;
+      successfulReleases: number;
+    }>;
+  }>;
 }
 
 export interface LLMAnalysisResponse {

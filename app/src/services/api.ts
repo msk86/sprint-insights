@@ -60,12 +60,14 @@ export const llmApi = {
   analyzeSprint: async (
     sprintData: SprintData, 
     historicalData?: SprintData[], 
-    stats?: any
+    stats?: any,
+    historicalStats?: any[]
   ): Promise<LLMAnalysisResponse> => {
     const response = await api.post('/llm/analyze', {
       sprintData,
       historicalData,
-      stats
+      stats,
+      historicalStats
     });
     return response.data;
   },
@@ -73,12 +75,18 @@ export const llmApi = {
   freeChat: async (
     sprintData: SprintData, 
     userMessage: string,
-    stats?: any
+    stats?: any,
+    chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
+    historicalData?: SprintData[],
+    historicalStats?: any[]
   ): Promise<LLMAnalysisResponse> => {
     const response = await api.post('/llm/chat', {
       sprintData,
       userMessage,
-      stats
+      stats,
+      chatHistory,
+      historicalData,
+      historicalStats
     });
     return response.data;
   }

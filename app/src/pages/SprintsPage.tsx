@@ -41,6 +41,7 @@ import LLMChat from '../components/LLMChat';
 import { formatDate, formatDateRange } from '../utils/dateFormat';
 import { applyIssueFlagsToSprintData, FLAG_FILTERS } from '../services/issue';
 import { calculateSprintStats, calculateDoraMetrics } from '../services/stats';
+import { calculateBuildSummaryByPipeline } from '../utils/buildStats';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -73,6 +74,7 @@ const SprintsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sprintData, setSprintData] = useState<SprintData | null>(null);
   const [historicalData, setHistoricalData] = useState<{ currentSprint: SprintData; historicalSprints: SprintData[] } | null>(null);
+  const [historicalStats, setHistoricalStats] = useState<any[] | null>(null);
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysisResponse | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
@@ -173,6 +175,9 @@ const SprintsPage: React.FC = () => {
       const sprintStats = calculateSprintStats(currentSprintWithFlags);
       const doraMetrics = calculateDoraMetrics(currentSprintWithFlags);
       
+      // Calculate build/release summary per pipeline
+      const buildSummaryByPipeline = calculateBuildSummaryByPipeline(currentSprintWithFlags.builds);
+      
       const stats = {
         totalIssues: currentSprintWithFlags.issues.length,
         totalPoints: currentSprintWithFlags.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
@@ -191,10 +196,50 @@ const SprintsPage: React.FC = () => {
         medianLeadTime: doraMetrics.avgLeadTime,
         changeFailureRate: doraMetrics.changeFailureRate,
         medianMTTR: doraMetrics.mttr,
+        buildSummaryByPipeline,
       };
 
+      // Calculate stats for historical sprints
+      const historicalStats = historicalSprints.map(sprint => {
+        const histStats = calculateSprintStats(sprint);
+        const histDora = calculateDoraMetrics(sprint);
+        
+        // Calculate build/release summary per pipeline for historical sprint
+        const buildSummaryByPipeline = calculateBuildSummaryByPipeline(sprint.builds);
+        
+        return {
+          sprintIndex: sprint.sprint.index,
+          sprintName: sprint.sprint.name,
+          totalIssues: sprint.issues.length,
+          totalPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+          completedIssues: histStats.throughput,
+          completedPoints: histStats.velocity,
+          backAndForthIssues: sprint.issues.filter(issue => issue.flags?.isBackAndForth).length,
+          incidentIssues: sprint.issues.filter(issue => issue.flags?.isIncidentResponse).length,
+          totalBuilds: sprint.builds.length,
+          totalReleases: sprint.builds.filter(b => b.isRelease).length,
+          successfulBuilds: sprint.builds.filter(b => b.status === 'passed').length,
+          successfulReleases: sprint.builds.filter(b => b.isRelease && b.status === 'passed').length,
+          avgBuildDuration: sprint.builds.length > 0 
+            ? sprint.builds.reduce((sum, b) => sum + b.duration, 0) / sprint.builds.length / 60
+            : 0,
+          deploymentFrequency: histDora.deploymentFrequency,
+          medianLeadTime: histDora.avgLeadTime,
+          changeFailureRate: histDora.changeFailureRate,
+          medianMTTR: histDora.mttr,
+          buildSummaryByPipeline,
+        };
+      });
+
+      // Store historical stats in state for LLM chat
+      setHistoricalStats(historicalStats.length > 0 ? historicalStats : null);
+
+      // Prepare sprint data without builds for LLM
+      const currentSprintForLLM = { ...currentSprintWithFlags, builds: [] };
+      const historicalSprintsForLLM = historicalSprints.map(sprint => ({ ...sprint, builds: [] }));
+
       // Get LLM analysis
-      const analysis = await llmApi.analyzeSprint(currentSprintWithFlags, historicalSprints, stats);
+      const analysis = await llmApi.analyzeSprint(currentSprintForLLM, historicalSprintsForLLM, stats, historicalStats);
       setLlmAnalysis(analysis);
 
     } catch (err) {
@@ -306,9 +351,11 @@ const SprintsPage: React.FC = () => {
                     <Tab label="Releases" icon={<RocketLaunchIcon />} />
                   )}
                   <Tab label="Analysis" icon={<ChatIcon />} />
-                  {historicalData && historicalData.historicalSprints.length > 0 && (
-                    <Tab label="Trends" icon={<AnalyticsIcon />} />
-                  )}
+                  <Tab 
+                    label="Trends" 
+                    icon={<AnalyticsIcon />} 
+                    disabled={!historicalData || historicalData.historicalSprints.length === 0}
+                  />
                 </Tabs>
               </Box>
 
@@ -427,14 +474,23 @@ const SprintsPage: React.FC = () => {
                 />
               </TabPanel>
 
-              {historicalData && historicalData.historicalSprints.length > 0 && (
-                <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 3 : 2}>
+              <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 3 : 2}>
+                {historicalData && historicalData.historicalSprints.length > 0 ? (
                   <SprintTrends 
                     currentSprint={sprintData}
                     historicalSprints={historicalData.historicalSprints}
                   />
-                </TabPanel>
-              )}
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      No Historical Data Available
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Increase the "Historical Sprints" count and search again to view trend analysis.
+                    </Typography>
+                  </Box>
+                )}
+              </TabPanel>
             </Paper>
           </Box>
 
@@ -472,7 +528,11 @@ const SprintsPage: React.FC = () => {
                   </Tooltip>
                 </Box>
                 <Box sx={{ flex: 1, overflow: 'hidden', p: 2, pt: 1 }}>
-                  <LLMChat sprintData={sprintData} />
+                  <LLMChat 
+                    sprintData={sprintData} 
+                    historicalData={historicalData?.historicalSprints}
+                    historicalStats={historicalStats || undefined}
+                  />
                 </Box>
               </Paper>
             </Box>
