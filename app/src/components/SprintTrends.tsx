@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { SprintData } from '../types';
-import { calculateDoraMetrics, calculateReleaseStats } from '../services/stats';
+import { calculateDoraMetrics, calculateReleaseStats, isUsingStoryPoints } from '../services/stats';
 
 interface SprintTrendsProps {
   currentSprint: SprintData;
@@ -28,6 +28,10 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
   currentSprint, 
   historicalSprints 
 }) => {
+  // Check if any sprint in the series is using story points
+  const allSprints = [currentSprint, ...historicalSprints];
+  const usingStoryPoints = allSprints.some(sprint => isUsingStoryPoints(sprint));
+
   const extractSprintIndex = (sprintName: string, sprintIndex: number): string => {
     // Extract sprint index using regex pattern
     const match = sprintName.match(/(^|\D)(\d{1,4})(\D|$)/);
@@ -102,6 +106,184 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
     return label;
   };
 
+  // Define all chart cards
+  const chartCards = [
+    {
+      title: 'DORA: Lead Time for Changes',
+      yAxisLabel: 'Days',
+      lines: [
+        {
+          dataKey: 'leadTime',
+          stroke: '#8884d8',
+          name: 'Lead Time (days)',
+          formatter: (value: number) => `${value.toFixed(1)} days`
+        }
+      ]
+    },
+    {
+      title: 'DORA: Deployment Frequency',
+      yAxisLabel: 'Per Day',
+      lines: [
+        {
+          dataKey: 'deploymentFrequency',
+          stroke: '#4caf50',
+          name: 'Deployments/day',
+          formatter: (value: number) => `${value.toFixed(2)} per day`
+        }
+      ]
+    },
+    {
+      title: 'DORA: Change Failure Rate',
+      yAxisLabel: '%',
+      lines: [
+        {
+          dataKey: 'changeFailureRate',
+          stroke: '#ff6b6b',
+          name: 'Failure Rate (%)',
+          formatter: (value: number) => `${value.toFixed(1)}%`
+        }
+      ]
+    },
+    {
+      title: 'DORA: Mean Time to Restore',
+      yAxisLabel: 'Hours',
+      lines: [
+        {
+          dataKey: 'mttr',
+          stroke: '#ff9800',
+          name: 'MTTR (hours)',
+          formatter: (value: number) => `${value.toFixed(1)} hours`
+        }
+      ]
+    },
+    {
+      title: usingStoryPoints ? 'Completed Story Points & Issues' : 'Completed Issues',
+      yAxisLabel: '',
+      lines: [
+        ...(usingStoryPoints ? [{
+          dataKey: 'completedPoints',
+          stroke: '#82ca9d',
+          name: 'Completed Points',
+          formatter: (value: number) => `${value} points`
+        }] : []),
+        {
+          dataKey: 'completedIssues',
+          stroke: '#8884d8',
+          name: 'Completed Issues',
+          formatter: (value: number) => `${value} issues`
+        }
+      ]
+    },
+    {
+      title: 'Issue Completion Metrics',
+      yAxisLabel: '',
+      lines: [
+        {
+          dataKey: 'totalIssues',
+          stroke: '#8884d8',
+          name: 'Total Issues',
+          formatter: (value: number) => `${value} issues`
+        },
+        {
+          dataKey: 'completedIssues',
+          stroke: '#4caf50',
+          name: 'Completed',
+          formatter: (value: number) => `${value} issues`
+        },
+        {
+          dataKey: 'closedIssues',
+          stroke: '#9e9e9e',
+          name: 'Closed',
+          formatter: (value: number) => `${value} issues`
+        }
+      ]
+    },
+    {
+      title: 'Abnormal Issue Metrics',
+      yAxisLabel: '',
+      lines: [
+        {
+          dataKey: 'unplannedIssues',
+          stroke: '#ff9800',
+          name: 'Unplanned Issues',
+          formatter: (value: number) => `${value} issues`
+        },
+        {
+          dataKey: 'blockedIssues',
+          stroke: '#f44336',
+          name: 'Blocked Issues',
+          formatter: (value: number) => `${value} issues`
+        },
+        {
+          dataKey: 'backAndForthIssues',
+          stroke: '#9c27b0',
+          name: 'Back-and-forth Issues',
+          formatter: (value: number) => `${value} issues`
+        }
+      ]
+    },
+    {
+      title: 'Release Metrics',
+      yAxisLabel: '',
+      lines: [
+        {
+          dataKey: 'totalReleases',
+          stroke: '#2196f3',
+          name: 'Total Releases',
+          formatter: (value: number) => `${value} releases`
+        },
+        {
+          dataKey: 'successfulReleases',
+          stroke: '#4caf50',
+          name: 'Successful Releases',
+          formatter: (value: number) => `${value} releases`
+        }
+      ]
+    }
+  ];
+
+  const renderChartCard = (card: typeof chartCards[0]) => (
+    <Card>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          {card.title}
+        </Typography>
+        <Box sx={{ height: 300 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis label={card.yAxisLabel ? { value: card.yAxisLabel, angle: -90, position: 'insideLeft' } : undefined} />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  const line = card.lines.find(l => l.name === name);
+                  return line ? [line.formatter(value), name] : [value, name];
+                }}
+                labelFormatter={sprintLabelFormatter as any}
+              />
+              <Legend />
+              {card.lines.map((line) => (
+                <Line
+                  key={line.dataKey}
+                  type="monotone"
+                  dataKey={line.dataKey}
+                  stroke={line.stroke}
+                  strokeWidth={2}
+                  name={line.name}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+
+  // Split cards into left and right columns based on index
+  const leftCards = chartCards.filter((_, index) => index % 2 === 0);
+  const rightCards = chartCards.filter((_, index) => index % 2 === 1);
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
@@ -112,309 +294,22 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
         {/* Left Column */}
         <Grid item xs={12} md={6}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* DORA: Lead Time for Changes */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Lead Time for Changes
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis label={{ value: 'Days', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)} days`, 'Lead Time']}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="leadTime" 
-                        stroke="#8884d8" 
-                        strokeWidth={2}
-                        name="Lead Time (days)"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* DORA: Change Failure Rate */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Change Failure Rate
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis label={{ value: '%', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Failure Rate']}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="changeFailureRate" 
-                        stroke="#ff6b6b" 
-                        strokeWidth={2}
-                        name="Failure Rate (%)"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Story Points & Issues */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Completed Story Points & Issues
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number, name: string) => [
-                          name === 'Completed Issues' ? `${value} issues` : `${value} points`,
-                          name
-                        ]}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="completedPoints" 
-                        stroke="#82ca9d" 
-                        strokeWidth={2}
-                        name="Completed Points"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="completedIssues" 
-                        stroke="#8884d8" 
-                        strokeWidth={2}
-                        name="Completed Issues"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Abnormal Issue Metrics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Abnormal Issue Metrics
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value} issues`]}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="unplannedIssues" 
-                        stroke="#ff9800" 
-                        strokeWidth={2}
-                        name="Unplanned Issues"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="blockedIssues" 
-                        stroke="#f44336" 
-                        strokeWidth={2}
-                        name="Blocked Issues"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="backAndForthIssues" 
-                        stroke="#9c27b0" 
-                        strokeWidth={2}
-                        name="Back-and-forth Issues"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
+            {leftCards.map((card, index) => (
+              <React.Fragment key={index}>
+                {renderChartCard(card)}
+              </React.Fragment>
+            ))}
           </Box>
         </Grid>
 
         {/* Right Column */}
         <Grid item xs={12} md={6}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* DORA: Deployment Frequency */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Deployment Frequency
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis label={{ value: 'Per Day', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(2)} per day`, 'Deployment Frequency']}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="deploymentFrequency" 
-                        stroke="#4caf50" 
-                        strokeWidth={2}
-                        name="Deployments/day"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* DORA: Mean Time to Restore */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Mean Time to Restore
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)} hours`, 'MTTR']}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="mttr" 
-                        stroke="#ff9800" 
-                        strokeWidth={2}
-                        name="MTTR (hours)"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Issue Completion Metrics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Issue Completion Metrics
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value} issues`]}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="totalIssues" 
-                        stroke="#8884d8" 
-                        strokeWidth={2}
-                        name="Total Issues"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="completedIssues" 
-                        stroke="#4caf50" 
-                        strokeWidth={2}
-                        name="Completed"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="closedIssues" 
-                        stroke="#9e9e9e" 
-                        strokeWidth={2}
-                        name="Closed"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Release Metrics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Release Metrics
-                </Typography>
-                <Box sx={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number) => [`${value} releases`]}
-                        labelFormatter={sprintLabelFormatter as any}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="totalReleases" 
-                        stroke="#2196f3" 
-                        strokeWidth={2}
-                        name="Total Releases"
-                        isAnimationActive={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="successfulReleases" 
-                        stroke="#4caf50" 
-                        strokeWidth={2}
-                        name="Successful Releases"
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
-              </CardContent>
-            </Card>
+            {rightCards.map((card, index) => (
+              <React.Fragment key={index}>
+                {renderChartCard(card)}
+              </React.Fragment>
+            ))}
           </Box>
         </Grid>
       </Grid>

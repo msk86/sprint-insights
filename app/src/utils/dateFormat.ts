@@ -154,11 +154,11 @@ export function formatISO(date: string | number | Date): string {
 }
 
 /**
- * Format date range (e.g., "Jan 1 - Jan 15, 2024")
+ * Format date range with duration (e.g., "Jan 1 - 15, 2024 (14 days)")
  * 
  * @param startDate - Start date
  * @param endDate - End date
- * @returns Formatted date range string
+ * @returns Formatted date range string with duration
  */
 export function formatDateRange(
   startDate: string | number | Date,
@@ -172,6 +172,11 @@ export function formatDateRange(
     return 'Invalid Date Range';
   }
   
+  // Calculate number of days
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const durationText = ` (${diffDays} day${diffDays !== 1 ? 's' : ''})`;
+  
   const startYear = start.getFullYear();
   const endYear = end.getFullYear();
   const startMonth = start.getMonth();
@@ -179,15 +184,18 @@ export function formatDateRange(
   
   // Same year and month
   if (startYear === endYear && startMonth === endMonth) {
-    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { day: 'numeric', year: 'numeric' })}`;
+    const monthDay = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const endDay = end.getDate();
+    const year = end.getFullYear();
+    return `${monthDay} - ${endDay}, ${year}${durationText}`;
   }
   
   // Same year, different month
   if (startYear === endYear) {
-    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}${durationText}`;
   }
   
   // Different years
-  return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}${durationText}`;
 }
 

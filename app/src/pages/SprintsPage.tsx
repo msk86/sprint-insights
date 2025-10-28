@@ -281,7 +281,9 @@ const SprintsPage: React.FC = () => {
                     <Tab label="Releases" icon={<RocketLaunchIcon />} />
                   )}
                   <Tab label="Analysis" icon={<ChatIcon />} />
-                  <Tab label="Trends" icon={<AnalyticsIcon />} />
+                  {historicalData && historicalData.historicalSprints.length > 0 && (
+                    <Tab label="Trends" icon={<AnalyticsIcon />} />
+                  )}
                 </Tabs>
               </Box>
 
@@ -400,12 +402,14 @@ const SprintsPage: React.FC = () => {
                 />
               </TabPanel>
 
-              <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 3 : 2}>
-                <SprintTrends 
-                  currentSprint={sprintData}
-                  historicalSprints={historicalData?.historicalSprints || []}
-                />
-              </TabPanel>
+              {historicalData && historicalData.historicalSprints.length > 0 && (
+                <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 3 : 2}>
+                  <SprintTrends 
+                    currentSprint={sprintData}
+                    historicalSprints={historicalData.historicalSprints}
+                  />
+                </TabPanel>
+              )}
             </Paper>
           </Box>
 

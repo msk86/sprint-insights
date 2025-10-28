@@ -327,3 +327,170 @@ export function formatDuration(seconds: number): string {
   }
 }
 
+export interface DailyCumulativeData {
+  date: string;
+  dateObj: Date;
+  total: number;
+  [columnName: string]: number | string | Date;
+}
+
+/**
+ * Check if the team is using story point estimation
+ */
+export function isUsingStoryPoints(sprintData: SprintData): boolean {
+  return sprintData.issues.some(issue => issue.storyPoints > 0);
+}
+
+/**
+ * Calculate daily cumulative story points by board column
+ * Returns data for stacked area/bar chart showing how story points accumulate over the sprint
+ * Excludes weekends (Saturday and Sunday)
+ */
+export function calculateDailyCumulativePoints(sprintData: SprintData): DailyCumulativeData[] {
+  const startDate = new Date(sprintData.sprint.start);
+  const endDate = new Date(sprintData.sprint.end);
+  
+  // Generate all dates in the sprint, excluding weekends
+  const dates: Date[] = [];
+  const currentDate = new Date(startDate);
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getDay();
+    // 0 = Sunday, 6 = Saturday
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      dates.push(new Date(currentDate));
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // Calculate cumulative points for each date
+  const dailyData: DailyCumulativeData[] = dates.map(date => {
+    const data: DailyCumulativeData = {
+      date: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      dateObj: date,
+      total: 0
+    };
+    
+    // Initialize all columns to 0
+    sprintData.columns.forEach(column => {
+      data[column.name] = 0;
+    });
+    
+    // For each issue, determine which column it was in on this date
+    sprintData.issues.forEach(issue => {
+      // Skip if issue was created after this date
+      const issueCreated = new Date(issue.created);
+      if (issueCreated > date) {
+        return;
+      }
+      
+      // Find the status of the issue on this date
+      let currentColumn = sprintData.columns[0].name; // Default to first column
+      
+      // Check if issue was created directly in a non-first column
+      if (issue.history.length > 0) {
+        const firstHistory = issue.history[0];
+        if (firstHistory.fromString) {
+          currentColumn = firstHistory.fromString;
+        }
+      }
+      
+      // Go through history to find the status on this date
+      for (const history of issue.history) {
+        const historyDate = new Date(history.at);
+        if (historyDate <= date) {
+          currentColumn = history.toString;
+        } else {
+          break;
+        }
+      }
+      
+      // Add story points to the current column
+      if (data[currentColumn] !== undefined) {
+        data[currentColumn] = (data[currentColumn] as number) + issue.storyPoints;
+        data.total += issue.storyPoints;
+      }
+    });
+    
+    return data;
+  });
+  
+  return dailyData;
+}
+
+/**
+ * Calculate daily cumulative issue count by board column
+ * Returns data for stacked area/bar chart showing how issue count accumulates over the sprint
+ * Excludes weekends (Saturday and Sunday)
+ * Used as a fallback when story points are not available
+ */
+export function calculateDailyCumulativeIssues(sprintData: SprintData): DailyCumulativeData[] {
+  const startDate = new Date(sprintData.sprint.start);
+  const endDate = new Date(sprintData.sprint.end);
+  
+  // Generate all dates in the sprint, excluding weekends
+  const dates: Date[] = [];
+  const currentDate = new Date(startDate);
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getDay();
+    // 0 = Sunday, 6 = Saturday
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      dates.push(new Date(currentDate));
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // Calculate cumulative issue count for each date
+  const dailyData: DailyCumulativeData[] = dates.map(date => {
+    const data: DailyCumulativeData = {
+      date: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      dateObj: date,
+      total: 0
+    };
+    
+    // Initialize all columns to 0
+    sprintData.columns.forEach(column => {
+      data[column.name] = 0;
+    });
+    
+    // For each issue, determine which column it was in on this date
+    sprintData.issues.forEach(issue => {
+      // Skip if issue was created after this date
+      const issueCreated = new Date(issue.created);
+      if (issueCreated > date) {
+        return;
+      }
+      
+      // Find the status of the issue on this date
+      let currentColumn = sprintData.columns[0].name; // Default to first column
+      
+      // Check if issue was created directly in a non-first column
+      if (issue.history.length > 0) {
+        const firstHistory = issue.history[0];
+        if (firstHistory.fromString) {
+          currentColumn = firstHistory.fromString;
+        }
+      }
+      
+      // Go through history to find the status on this date
+      for (const history of issue.history) {
+        const historyDate = new Date(history.at);
+        if (historyDate <= date) {
+          currentColumn = history.toString;
+        } else {
+          break;
+        }
+      }
+      
+      // Add 1 issue to the current column
+      if (data[currentColumn] !== undefined) {
+        data[currentColumn] = (data[currentColumn] as number) + 1;
+        data.total += 1;
+      }
+    });
+    
+    return data;
+  });
+  
+  return dailyData;
+}
+

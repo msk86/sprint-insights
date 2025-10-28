@@ -12,7 +12,19 @@ import {
   IconButton,
 } from '@mui/material';
 import { Info as InfoIcon } from '@mui/icons-material';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend
+} from 'recharts';
 import { SprintData, LLMAnalysisResponse } from '../types';
 import { formatDays } from '../utils/timeCalculation';
 import {
@@ -25,6 +37,9 @@ import {
   getLeadTimeLevel,
   getChangeFailureRateLevel,
   getMTTRLevel,
+  calculateDailyCumulativePoints,
+  calculateDailyCumulativeIssues,
+  isUsingStoryPoints,
   CATEGORY_COLORS,
   COMPLETION_COLORS,
   PLAN_COLORS,
@@ -36,6 +51,29 @@ interface SprintAnalysisProps {
   loading: boolean;
 }
 
+type CardType = 'metrics-grid' | 'pie-chart' | 'area-chart' | 'ai-analysis';
+
+interface MetricItem {
+  label: string;
+  value: string | number;
+  tooltip: string;
+  chip?: {
+    label: string;
+    color: 'success' | 'warning' | 'error' | 'default';
+  };
+  xs?: number;
+}
+
+interface CardConfig {
+  type: CardType;
+  title: string;
+  tooltip?: string;
+  render?: () => React.ReactNode;
+  metrics?: MetricItem[];
+  chartData?: any[];
+  chartConfig?: any;
+}
+
 const SprintAnalysis: React.FC<SprintAnalysisProps> = ({ 
   sprintData, 
   llmAnalysis, 
@@ -44,6 +82,329 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
   const stats = calculateSprintStats(sprintData);
   const releaseStats = calculateReleaseStats(sprintData);
   const doraMetrics = calculateDoraMetrics(sprintData);
+  const usingStoryPoints = isUsingStoryPoints(sprintData);
+  const dailyCumulativeData = usingStoryPoints 
+    ? calculateDailyCumulativePoints(sprintData)
+    : calculateDailyCumulativeIssues(sprintData);
+  
+  // Generate colors for each column
+  const columnColors = [
+    '#8884d8', '#82ca9d', '#ffc658', '#ff8042', 
+    '#0088fe', '#00c49f', '#ffbb28', '#a4de6c'
+  ];
+
+  // Define all cards configuration
+  const cards: CardConfig[] = [
+    // DORA Metrics
+    {
+      type: 'metrics-grid',
+      title: 'DORA Metrics',
+      metrics: [
+        {
+          label: 'Deployment Frequency',
+          value: doraMetrics.deploymentFrequency.toFixed(2),
+          tooltip: 'Successful releases per business day',
+          chip: getDeploymentFrequencyLevel(doraMetrics.deploymentFrequency),
+          xs: 6
+        },
+        {
+          label: 'Lead Time for Changes',
+          value: doraMetrics.avgLeadTime > 0 ? formatDays(doraMetrics.avgLeadTime) : 'N/A',
+          tooltip: 'Median cycle time from work start to completion',
+          chip: getLeadTimeLevel(doraMetrics.avgLeadTime),
+          xs: 6
+        },
+        {
+          label: 'Change Failure Rate',
+          value: `${doraMetrics.changeFailureRate.toFixed(1)}%`,
+          tooltip: 'Number of incidents per successful release. An incident is an unplanned issue with incident response type (sub-category contains \'incident\').',
+          chip: getChangeFailureRateLevel(doraMetrics.changeFailureRate),
+          xs: 6
+        },
+        {
+          label: 'Mean Time to Restore',
+          value: doraMetrics.mttr > 0 ? formatDuration(doraMetrics.mttr) : 'N/A',
+          tooltip: 'Median time to resolve incidents from creation to completion',
+          chip: getMTTRLevel(doraMetrics.mttr),
+          xs: 6
+        }
+      ]
+    },
+    // Release Statistics
+    {
+      type: 'metrics-grid',
+      title: 'Release Statistics',
+      metrics: [
+        {
+          label: 'Total Releases',
+          value: releaseStats.totalReleases,
+          tooltip: 'Total number of production deployments',
+          xs: 6
+        },
+        {
+          label: 'Successful Releases',
+          value: releaseStats.successfulReleases,
+          tooltip: 'Number of successful production deployments',
+          chip: releaseStats.totalReleases > 0 ? {
+            label: `${releaseStats.releaseSuccessRate.toFixed(0)}%`,
+            color: getSuccessRateColor(releaseStats.releaseSuccessRate, releaseStats.totalReleases > 0)
+          } : undefined,
+          xs: 6
+        },
+        {
+          label: 'Total Builds',
+          value: releaseStats.totalBuilds,
+          tooltip: 'Total number of builds',
+          xs: 6
+        },
+        {
+          label: 'Successful Builds',
+          value: releaseStats.successfulBuilds,
+          tooltip: 'Number of successful builds',
+          chip: releaseStats.totalBuilds > 0 ? {
+            label: `${releaseStats.buildSuccessRate.toFixed(0)}%`,
+            color: getSuccessRateColor(releaseStats.buildSuccessRate, releaseStats.totalBuilds > 0)
+          } : undefined,
+          xs: 6
+        },
+        {
+          label: 'Avg Build Duration',
+          value: formatDuration(releaseStats.avgBuildDuration),
+          tooltip: 'Average duration of builds',
+          xs: 6
+        }
+      ]
+    },
+    // Sprint Statistics
+    {
+      type: 'metrics-grid',
+      title: 'Sprint Statistics',
+      metrics: [
+        {
+          label: 'Throughput',
+          value: stats.throughput,
+          tooltip: 'Number of completed issues',
+          xs: usingStoryPoints ? 6 : 12
+        },
+        ...(usingStoryPoints ? [{
+          label: 'Velocity',
+          value: stats.velocity,
+          tooltip: 'Total story points completed',
+          xs: 6
+        }] : []),
+        {
+          label: 'Avg Cycle Time',
+          value: formatDays(stats.avgCycleTime),
+          tooltip: 'Average time from work start to completion',
+          xs: usingStoryPoints ? 6 : 12
+        },
+        ...(usingStoryPoints ? [{
+          label: 'Avg Points per Issue',
+          value: stats.avgStoryPoints.toFixed(1),
+          tooltip: 'Average story points across all issues',
+          xs: 6
+        }] : [])
+      ]
+    },
+    // Category Distribution
+    {
+      type: 'pie-chart',
+      title: 'Category Distribution',
+      tooltip: 'Distribution of issues by sub-category',
+      chartData: stats.categoryData,
+      chartConfig: {
+        colors: CATEGORY_COLORS,
+        label: (entry: any, percent: number) => `${entry.name}: ${(percent * 100).toFixed(0)}%`,
+        tooltipFormatter: (value: number) => `${value} issues`
+      }
+    },
+    // Completion Distribution
+    {
+      type: 'pie-chart',
+      title: 'Completion Status',
+      tooltip: 'Distribution of issues by completion status: Completed, Closed, or Spillover',
+      chartData: stats.completionData,
+      chartConfig: {
+        colors: COMPLETION_COLORS,
+        label: (entry: any, percent: number) => `${entry.name}: ${(percent * 100).toFixed(0)}%`,
+        tooltipFormatter: (value: number) => `${value} issues`
+      }
+    },
+    // Plan Distribution
+    {
+      type: 'pie-chart',
+      title: 'Planned vs Unplanned',
+      tooltip: 'Distribution of issues created before sprint (Planned) vs during sprint (Unplanned)',
+      chartData: stats.planData,
+      chartConfig: {
+        colors: PLAN_COLORS,
+        label: (entry: any, percent: number) => `${entry.name}: ${(percent * 100).toFixed(0)}%`,
+        tooltipFormatter: (value: number) => `${value} issues`
+      }
+    },
+    // Daily Cumulative Chart
+    {
+      type: 'area-chart',
+      title: usingStoryPoints ? 'Daily Cumulative Story Points' : 'Daily Cumulative Issues',
+      tooltip: usingStoryPoints 
+        ? 'Cumulative story points by board column over the sprint duration. Shows how work progresses through different stages.'
+        : 'Cumulative issue count by board column over the sprint duration. Shows how work progresses through different stages.',
+      render: () => (
+        <Box sx={{ height: 400 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={dailyCumulativeData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                label={{ value: 'Date', position: 'insideBottom', offset: -5 }}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis 
+                label={{ value: usingStoryPoints ? 'Story Points' : 'Issues', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip 
+                formatter={(value: number) => usingStoryPoints ? `${value} points` : `${value} issues`}
+              />
+              <Legend />
+              {sprintData.columns.map((column, index) => (
+                <Area
+                  key={column.name}
+                  type="monotone"
+                  dataKey={column.name}
+                  stackId="1"
+                  stroke={columnColors[index % columnColors.length]}
+                  fill={columnColors[index % columnColors.length]}
+                  isAnimationActive={false}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </Box>
+      )
+    }
+  ];
+
+  const renderMetricsGridCard = (card: CardConfig) => (
+    <Card>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          {card.title}
+        </Typography>
+        <Grid container spacing={2}>
+          {card.metrics?.map((metric, index) => (
+            <Grid item xs={metric.xs || 6} key={index}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {metric.label}
+                </Typography>
+                <MuiTooltip title={metric.tooltip} arrow>
+                  <IconButton size="small" sx={{ p: 0 }}>
+                    <InfoIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </MuiTooltip>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                <Typography variant="h4">
+                  {metric.value}
+                </Typography>
+                {metric.chip && (
+                  <Chip
+                    size="small"
+                    label={metric.chip.label}
+                    color={metric.chip.color}
+                  />
+                )}
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+
+  const renderPieChartCard = (card: CardConfig) => (
+    <Card>
+      <CardContent>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Typography variant="h6">
+            {card.title}
+          </Typography>
+          {card.tooltip && (
+            <MuiTooltip title={card.tooltip} arrow>
+              <IconButton size="small" sx={{ p: 0 }}>
+                <InfoIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </MuiTooltip>
+          )}
+        </Box>
+        {card.chartData && card.chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie
+                data={card.chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => card.chartConfig?.label({ name }, percent)}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+                isAnimationActive={false}
+              >
+                {card.chartData.map((entry, index) => {
+                  const colors = card.chartConfig?.colors;
+                  const color = Array.isArray(colors)
+                    ? colors[index % colors.length]
+                    : colors[entry.name as keyof typeof colors];
+                  return <Cell key={`cell-${entry.name}`} fill={color} />;
+                })}
+              </Pie>
+              <Tooltip formatter={card.chartConfig?.tooltipFormatter} />
+            </PieChart>
+          </ResponsiveContainer>
+        ) : (
+          <Typography color="text.secondary">No data available</Typography>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const renderAreaChartCard = (card: CardConfig) => (
+    <Card>
+      <CardContent>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Typography variant="h6">
+            {card.title}
+          </Typography>
+          {card.tooltip && (
+            <MuiTooltip title={card.tooltip} arrow>
+              <IconButton size="small" sx={{ p: 0 }}>
+                <InfoIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </MuiTooltip>
+          )}
+        </Box>
+        {card.render?.()}
+      </CardContent>
+    </Card>
+  );
+
+  const renderCard = (card: CardConfig) => {
+    switch (card.type) {
+      case 'metrics-grid':
+        return renderMetricsGridCard(card);
+      case 'pie-chart':
+        return renderPieChartCard(card);
+      case 'area-chart':
+        return renderAreaChartCard(card);
+      default:
+        return null;
+    }
+  };
+
+  // Split cards into left and right columns based on index
+  const leftCards = cards.filter((_, index) => index % 2 === 0);
+  const rightCards = cards.filter((_, index) => index % 2 === 1);
 
   return (
     <Box>
@@ -55,405 +416,22 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
         {/* Left Column */}
         <Grid item xs={12} md={6}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* DORA Metrics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  DORA Metrics
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Deployment Frequency
-                      </Typography>
-                      <MuiTooltip title="Successful releases per business day" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {doraMetrics.deploymentFrequency.toFixed(2)}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={getDeploymentFrequencyLevel(doraMetrics.deploymentFrequency).label}
-                        color={getDeploymentFrequencyLevel(doraMetrics.deploymentFrequency).color}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Lead Time for Changes
-                      </Typography>
-                      <MuiTooltip title="Median cycle time from work start to completion" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {doraMetrics.avgLeadTime > 0 ? formatDays(doraMetrics.avgLeadTime) : 'N/A'}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={getLeadTimeLevel(doraMetrics.avgLeadTime).label}
-                        color={getLeadTimeLevel(doraMetrics.avgLeadTime).color}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Change Failure Rate
-                      </Typography>
-                      <MuiTooltip title="Number of incidents per successful release" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {doraMetrics.changeFailureRate.toFixed(1)}%
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={getChangeFailureRateLevel(doraMetrics.changeFailureRate).label}
-                        color={getChangeFailureRateLevel(doraMetrics.changeFailureRate).color}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Mean Time to Restore
-                      </Typography>
-                      <MuiTooltip title="Median time to resolve incidents from creation to completion" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {doraMetrics.mttr > 0 ? formatDuration(doraMetrics.mttr) : 'N/A'}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={getMTTRLevel(doraMetrics.mttr).label}
-                        color={getMTTRLevel(doraMetrics.mttr).color}
-                      />
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-            
-            {/* Sprint Statistics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Sprint Statistics
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Throughput
-                      </Typography>
-                      <MuiTooltip title="Number of completed issues" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {stats.throughput}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Velocity
-                      </Typography>
-                      <MuiTooltip title="Total story points completed" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {stats.velocity}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Avg Cycle Time
-                      </Typography>
-                      <MuiTooltip title="Average time from work start to completion" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {formatDays(stats.avgCycleTime)}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Avg Points per Issue
-                      </Typography>
-                      <MuiTooltip title="Average story points across all issues" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {stats.avgStoryPoints.toFixed(1)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Completion Distribution */}
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6">
-                    Completion Status
-                  </Typography>
-                  <MuiTooltip title="Distribution of issues by completion status: Completed, Closed, or Spillover" arrow>
-                    <IconButton size="small" sx={{ p: 0 }}>
-                      <InfoIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </MuiTooltip>
-                </Box>
-                {stats.completionData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={stats.completionData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {stats.completionData.map((entry) => (
-                          <Cell key={`cell-${entry.name}`} fill={COMPLETION_COLORS[entry.name as keyof typeof COMPLETION_COLORS]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `${value} issues`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Typography color="text.secondary">No data available</Typography>
-                )}
-              </CardContent>
-            </Card>
-
+            {leftCards.map((card, index) => (
+              <React.Fragment key={index}>
+                {renderCard(card)}
+              </React.Fragment>
+            ))}
           </Box>
         </Grid>
 
         {/* Right Column */}
         <Grid item xs={12} md={6}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Release Statistics */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Release Statistics
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Releases
-                      </Typography>
-                      <MuiTooltip title="Total number of production deployments" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {releaseStats.totalReleases}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Successful Releases
-                      </Typography>
-                      <MuiTooltip title="Number of successful production deployments" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {releaseStats.successfulReleases}
-                      </Typography>
-                      {releaseStats.totalReleases > 0 && (
-                        <Chip
-                          label={`${releaseStats.releaseSuccessRate.toFixed(0)}%`}
-                          size="small"
-                          color={getSuccessRateColor(releaseStats.releaseSuccessRate, releaseStats.totalReleases > 0)}
-                        />
-                      )}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Builds
-                      </Typography>
-                      <MuiTooltip title="Total number of CI/CD builds" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {releaseStats.totalBuilds}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Successful Builds
-                      </Typography>
-                      <MuiTooltip title="Number of successful CI/CD builds" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h4">
-                        {releaseStats.successfulBuilds}
-                      </Typography>
-                      {releaseStats.totalBuilds > 0 && (
-                        <Chip
-                          label={`${releaseStats.buildSuccessRate.toFixed(0)}%`}
-                          size="small"
-                          color={getSuccessRateColor(releaseStats.buildSuccessRate, releaseStats.totalBuilds > 0)}
-                        />
-                      )}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Avg Build Duration
-                      </Typography>
-                      <MuiTooltip title="Average time to complete a build" arrow>
-                        <IconButton size="small" sx={{ p: 0 }}>
-                          <InfoIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </MuiTooltip>
-                    </Box>
-                    <Typography variant="h4">
-                      {formatDuration(releaseStats.avgBuildDuration)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Category Distribution */}
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6">
-                    Issues by Category
-                  </Typography>
-                  <MuiTooltip title="Distribution of issues across different sub-categories or work types" arrow>
-                    <IconButton size="small" sx={{ p: 0 }}>
-                      <InfoIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </MuiTooltip>
-                </Box>
-                {stats.categoryData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={stats.categoryData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {stats.categoryData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `${value} issues`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Typography color="text.secondary">No data available</Typography>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Plan Distribution */}
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6">
-                    Planned vs Unplanned
-                  </Typography>
-                  <MuiTooltip title="Distribution of issues created before sprint (Planned) vs during sprint (Unplanned)" arrow>
-                    <IconButton size="small" sx={{ p: 0 }}>
-                      <InfoIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </MuiTooltip>
-                </Box>
-                {stats.planData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={stats.planData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {stats.planData.map((entry) => (
-                          <Cell key={`cell-${entry.name}`} fill={PLAN_COLORS[entry.name as keyof typeof PLAN_COLORS]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `${value} issues`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Typography color="text.secondary">No data available</Typography>
-                )}
-              </CardContent>
-            </Card>
+            {rightCards.map((card, index) => (
+              <React.Fragment key={index}>
+                {renderCard(card)}
+              </React.Fragment>
+            ))}
           </Box>
         </Grid>
 
@@ -475,35 +453,39 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                   </Typography>
                   
                   {llmAnalysis.insights && llmAnalysis.insights.length > 0 && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Key Insights
+                    <Box mb={2}>
+                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                        Key Insights:
                       </Typography>
-                      {llmAnalysis.insights.map((insight, index) => (
-                        <Alert key={index} severity="info" sx={{ mb: 1 }}>
-                          {insight}
-                        </Alert>
-                      ))}
+                      <ul>
+                        {llmAnalysis.insights.map((insight, index) => (
+                          <li key={index}>
+                            <Typography variant="body2">{insight}</Typography>
+                          </li>
+                        ))}
+                      </ul>
                     </Box>
                   )}
-
+                  
                   {llmAnalysis.recommendations && llmAnalysis.recommendations.length > 0 && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Recommendations
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                        Recommendations:
                       </Typography>
-                      {llmAnalysis.recommendations.map((recommendation, index) => (
-                        <Alert key={index} severity="success" sx={{ mb: 1 }}>
-                          {recommendation}
-                        </Alert>
-                      ))}
+                      <ul>
+                        {llmAnalysis.recommendations.map((rec, index) => (
+                          <li key={index}>
+                            <Typography variant="body2">{rec}</Typography>
+                          </li>
+                        ))}
+                      </ul>
                     </Box>
                   )}
                 </Box>
               ) : (
-                <Typography color="text.secondary">
-                  No analysis available
-                </Typography>
+                <Alert severity="info">
+                  Click "Analyze with AI" to get insights and recommendations
+                </Alert>
               )}
             </CardContent>
           </Card>
