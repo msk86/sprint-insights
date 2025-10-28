@@ -48,7 +48,6 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
       const notes: string[] = [];
       if (issue.flags?.isBlocked) notes.push('Blocked');
       if (issue.flags?.isUnplanned) notes.push('Unplanned');
-      if (issue.flags?.isSpillover) notes.push('Spillover');
       if (issue.flags?.isNotStarted) notes.push('Not Started');
       if (issue.flags?.isBackAndForth) notes.push('Back-and-forth');
       
@@ -206,14 +205,14 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
         Sprint Issues ({enrichedIssues.length} total)
       </Typography>
       
-      <Box sx={{ height: 480, width: '100%' }}>
+      <Box sx={{ width: '100%' }}>
         <DataGrid
           rows={enrichedIssues}
           columns={columns}
-          pageSizeOptions={[15, 30, 50]}
+          pageSizeOptions={[30, 50]}
           initialState={{
             pagination: {
-              paginationModel: { page: 0, pageSize: 15 },
+              paginationModel: { page: 0, pageSize: 30 },
             },
           }}
           disableRowSelectionOnClick

@@ -19,18 +19,24 @@ import {
   Paper,
   Chip,
   Stack,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Chat as ChatIcon,
   Analytics as AnalyticsIcon,
   Info as InfoIcon,
+  ChevronRight as ChevronRightIcon,
+  ChevronLeft as ChevronLeftIcon,
+  RocketLaunch as RocketLaunchIcon,
 } from '@mui/icons-material';
 import { TeamConfig, SprintData, LLMAnalysisResponse } from '../types';
 import { teamApi, sprintApi, llmApi } from '../services/api';
 import SprintIssuesTable from '../components/SprintIssuesTable';
 import SprintAnalysis from '../components/SprintAnalysis';
 import SprintTrends from '../components/SprintTrends';
+import SprintReleases from '../components/SprintReleases';
 import LLMChat from '../components/LLMChat';
 import { formatDate, formatDateRange } from '../utils/dateFormat';
 import { applyIssueFlagsToSprintData, FLAG_FILTERS } from '../services/issue';
@@ -70,6 +76,7 @@ const SprintsPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [selectedFlags, setSelectedFlags] = useState<string[]>([]);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
 
   // Get unique sub-categories from sprint data
   const subCategories = useMemo(() => {
@@ -264,12 +271,15 @@ const SprintsPage: React.FC = () => {
       </Card>
 
       {sprintData && (
-        <Grid container spacing={2}>
-          <Grid item xs={12} lg={8}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Paper sx={{ width: '100%' }}>
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs value={tabValue} onChange={handleTabChange}>
                   <Tab label="Sprint" icon={<InfoIcon />} />
+                  {sprintData.builds.length > 0 && (
+                    <Tab label="Releases" icon={<RocketLaunchIcon />} />
+                  )}
                   <Tab label="Analysis" icon={<ChatIcon />} />
                   <Tab label="Trends" icon={<AnalyticsIcon />} />
                 </Tabs>
@@ -376,7 +386,13 @@ const SprintsPage: React.FC = () => {
                 </Card>
               </TabPanel>
 
-              <TabPanel value={tabValue} index={1}>
+              {sprintData.builds.length > 0 && (
+                <TabPanel value={tabValue} index={1}>
+                  <SprintReleases sprintData={sprintData} />
+                </TabPanel>
+              )}
+
+              <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 2 : 1}>
                 <SprintAnalysis 
                   sprintData={sprintData} 
                   llmAnalysis={llmAnalysis}
@@ -384,32 +400,77 @@ const SprintsPage: React.FC = () => {
                 />
               </TabPanel>
 
-              <TabPanel value={tabValue} index={2}>
+              <TabPanel value={tabValue} index={sprintData.builds.length > 0 ? 3 : 2}>
                 <SprintTrends 
                   currentSprint={sprintData}
                   historicalSprints={historicalData?.historicalSprints || []}
                 />
               </TabPanel>
             </Paper>
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} lg={4}>
-            <Paper 
-              sx={{ 
-                position: 'sticky',
-                top: 16,
-                height: 'calc(100vh - 232px)',
-                width: '100%',
-                p: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}
-            >
-              <LLMChat sprintData={sprintData} />
-            </Paper>
-          </Grid>
-        </Grid>
+          {/* Chat Panel with Collapse/Expand */}
+          {!isChatCollapsed && (
+            <Box sx={{ width: 420, maxWidth: 420, flexShrink: 0 }}>
+              <Paper 
+                sx={{ 
+                  position: 'sticky',
+                  top: 16,
+                  height: 'calc(100vh - 232px)',
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  p: 2,
+                  pb: 1,
+                  borderBottom: 1,
+                  borderColor: 'divider'
+                }}>
+                  <Typography variant="h6">AI Assistant</Typography>
+                  <Tooltip title="Hide chat">
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setIsChatCollapsed(true)}
+                    >
+                      <ChevronRightIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ flex: 1, overflow: 'hidden', p: 2, pt: 1 }}>
+                  <LLMChat sprintData={sprintData} />
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {/* Expand Button when Chat is Collapsed */}
+          {isChatCollapsed && (
+            <Box sx={{ position: 'fixed', right: 16, top: '50%', transform: 'translateY(-50%)', zIndex: 1000 }}>
+              <Tooltip title="Show AI Assistant" placement="left">
+                <IconButton 
+                  color="primary"
+                  onClick={() => setIsChatCollapsed(false)}
+                  sx={{
+                    bgcolor: 'background.paper',
+                    boxShadow: 2,
+                    '&:hover': {
+                      bgcolor: 'background.paper',
+                      boxShadow: 4,
+                    }
+                  }}
+                >
+                  <ChevronLeftIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+        </Box>
       )}
 
       {!sprintData && !loading && (

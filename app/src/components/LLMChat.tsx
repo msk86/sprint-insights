@@ -85,10 +85,6 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Typography variant="h6" gutterBottom>
-        AI Assistant
-      </Typography>
-      
       <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
         Ask questions about the sprint data and get AI-powered insights.
       </Typography>

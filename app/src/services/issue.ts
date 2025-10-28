@@ -21,16 +21,16 @@ export interface IssueFlags {
 /**
  * Determines if an issue is incident response based on sub-category
  */
-export function isIncidentResponse(issue: Issue): boolean {
+export function isIncidentResponse(issue: Issue, _: SprintData): boolean {
   return !!(issue.subCategory && issue.subCategory.toLowerCase().includes('incident'));
 }
 
 /**
  * Determines if an issue was blocked during the sprint
  */
-export function isIssueBlocked(issue: Issue, sprintData: SprintData): boolean {
+export function isIssueBlocked(issue: Issue, _: SprintData): boolean {
   const blockRegex = /block/i;
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
+  const historiesInSprint = getHistoriesInSprint(issue);
   return historiesInSprint.some(h => blockRegex.test(h.toString));
 }
 
@@ -46,19 +46,19 @@ export function isIssueNotStarted(issue: Issue, sprintData: SprintData): boolean
     'selected for development'
   ].filter(Boolean);
   
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
+  const historiesInSprint = getHistoriesInSprint(issue);
   
   return (
     historiesInSprint.length === 0 ||
-    startStatuses.includes(historiesInSprint[0].toString.toLowerCase())
+    startStatuses.includes(historiesInSprint[historiesInSprint.length - 1].toString.toLowerCase())
   );
 }
 
 /**
  * Determines if an issue moved back and forth between statuses during the sprint
  */
-export function isIssueBackAndForth(issue: Issue, sprintData: SprintData): boolean {
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
+export function isIssueBackAndForth(issue: Issue, _: SprintData): boolean {
+  const historiesInSprint = getHistoriesInSprint(issue);
   const uniqueStatuses = new Set(historiesInSprint.map(h => h.toString));
   const repeatedStatuses = [...uniqueStatuses].filter(status =>
     historiesInSprint.filter(h => h.toString === status).length > 1
@@ -90,9 +90,9 @@ export function isIssueSpillover(issue: Issue, sprintData: SprintData): boolean 
     'complete'
   ].filter(Boolean);
   
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
-  const historiesAfterSprint = issue.history.filter(h =>
-    new Date(h.at) > new Date(sprintData.sprint.end)
+  const historiesInSprint = getHistoriesInSprint(issue, true);
+  const historiesAfterSprint = historiesInSprint.filter(h =>
+    new Date(h.at) >= new Date(sprintData.sprint.end)
   );
 
   return (
@@ -113,7 +113,7 @@ export function isIssueCompleted(issue: Issue, sprintData: SprintData): boolean 
     'complete'
   ].filter(Boolean);
   
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
+  const historiesInSprint = getHistoriesInSprint(issue);
 
   return (
     historiesInSprint.length > 0 &&
@@ -124,9 +124,9 @@ export function isIssueCompleted(issue: Issue, sprintData: SprintData): boolean 
 /**
  * Determines if an issue was closed during this sprint
  */
-export function isIssueClosed(issue: Issue, sprintData: SprintData): boolean {
+export function isIssueClosed(issue: Issue, _: SprintData): boolean {
   const closedStatuses = ['closed', 'resolved'];
-  const historiesInSprint = getHistoriesInSprint(issue, sprintData);
+  const historiesInSprint = getHistoriesInSprint(issue);
 
   return (
     historiesInSprint.length > 0 &&
@@ -137,14 +137,8 @@ export function isIssueClosed(issue: Issue, sprintData: SprintData): boolean {
 /**
  * Helper function to get issue histories within a sprint timeframe
  */
-function getHistoriesInSprint(issue: Issue, sprintData: SprintData) {
-  const sprintStart = new Date(sprintData.sprint.start);
-  const sprintEnd = new Date(sprintData.sprint.end);
-  
-  return issue.history.filter(h => {
-    const timestamp = new Date(h.at);
-    return timestamp >= sprintStart && timestamp <= sprintEnd;
-  });
+function getHistoriesInSprint(issue: Issue, withBoundary: boolean = false) {
+  return issue.history.filter(h => withBoundary ? true : h.inSprint === true);
 }
 
 /**
@@ -153,7 +147,7 @@ function getHistoriesInSprint(issue: Issue, sprintData: SprintData) {
 export function calculateIssueFlags(issue: Issue, sprintData: SprintData): IssueFlags {
   return {
     isBlocked: isIssueBlocked(issue, sprintData),
-    isIncidentResponse: isIncidentResponse(issue),
+    isIncidentResponse: isIncidentResponse(issue, sprintData),
     isNotStarted: isIssueNotStarted(issue, sprintData),
     isBackAndForth: isIssueBackAndForth(issue, sprintData),
     isUnplanned: isIssueUnplanned(issue, sprintData),
