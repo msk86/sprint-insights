@@ -9,6 +9,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { SprintData, LLMAnalysisResponse } from '../types';
 import { calculateBusinessDays, formatDays } from '../utils/timeCalculation';
 
@@ -23,6 +24,19 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
   llmAnalysis, 
   loading 
 }) => {
+  // Define colors for pie charts
+  const CATEGORY_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
+  const COMPLETION_COLORS = {
+    'Completed': '#4CAF50',
+    'Closed': '#9E9E9E',
+    'Spillover': '#FF9800',
+    'Not Started': '#F44336'
+  };
+  const PLAN_COLORS = {
+    'Planned': '#2196F3',
+    'Unplanned': '#FF5722'
+  };
+
   const calculateStats = () => {
     const completedIssues = sprintData.issues.filter(issue => issue.flags?.isCompleted || issue.flags?.isClosed);
     
@@ -40,7 +54,6 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
         totalCycleTime += cycleTime;
         cycleTimeCount++;
       } else {
-        // use history to calculate cycle time
         const inSprintHistory = issue.history.filter(h => h.inSprint);
         if (inSprintHistory.length >= 2) {
           const firstEvent = new Date(inSprintHistory[0].at);
@@ -62,6 +75,41 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+    
+    const categoryData = Object.entries(categories).map(([name, value]) => ({ name, value }));
+
+    // Completion distribution
+    const completionCounts = {
+      'Completed': 0,
+      'Closed': 0,
+      'Spillover': 0,
+      'Not Started': 0
+    };
+    
+    sprintData.issues.forEach(issue => {
+      if (issue.flags?.isCompleted) {
+        completionCounts['Completed']++;
+      } else if (issue.flags?.isClosed) {
+        completionCounts['Closed']++;
+      } else if (issue.flags?.isSpillover) {
+        completionCounts['Spillover']++;
+      } else if (issue.flags?.isNotStarted) {
+        completionCounts['Not Started']++;
+      }
+    });
+    
+    const completionData = Object.entries(completionCounts)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({ name, value }));
+
+    // Plan distribution
+    const plannedCount = sprintData.issues.filter(issue => !issue.flags?.isUnplanned).length;
+    const unplannedCount = sprintData.issues.filter(issue => issue.flags?.isUnplanned).length;
+    
+    const planData = [
+      { name: 'Planned', value: plannedCount },
+      { name: 'Unplanned', value: unplannedCount }
+    ].filter(item => item.value > 0);
 
     return {
       throughput,
@@ -69,6 +117,9 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
       avgCycleTime,
       avgStoryPoints,
       categories,
+      categoryData,
+      completionData,
+      planData,
     };
   };
 
@@ -124,150 +175,232 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Sprint Statistics */}
+        {/* Left Column */}
         <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Sprint Statistics
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Throughput
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    (completed issues)
-                  </Typography>
-                  <Typography variant="h4">
-                    {stats.throughput}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Velocity
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    (completed points)
-                  </Typography>
-                  <Typography variant="h4">
-                    {stats.velocity}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg Cycle Time
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatDays(stats.avgCycleTime)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg Points per Issue
-                  </Typography>
-                  <Typography variant="h4">
-                    {stats.avgStoryPoints.toFixed(1)}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Release Statistics */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Release Statistics
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Releases
-                  </Typography>
-                  <Typography variant="h4">
-                    {releaseStats.totalReleases}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Successful Releases
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                    <Typography variant="h4">
-                      {releaseStats.successfulReleases}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Sprint Statistics */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Sprint Statistics
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Throughput
                     </Typography>
-                    {releaseStats.totalReleases > 0 && (
-                      <Chip
-                        label={`${releaseStats.releaseSuccessRate.toFixed(0)}%`}
-                        size="small"
-                        color={getSuccessRateColor(releaseStats.releaseSuccessRate, releaseStats.totalReleases > 0)}
-                      />
-                    )}
-                  </Box>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Builds
-                  </Typography>
-                  <Typography variant="h4">
-                    {releaseStats.totalBuilds}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Successful Builds
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                    <Typography variant="h4">
-                      {releaseStats.successfulBuilds}
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      (completed issues)
                     </Typography>
-                    {releaseStats.totalBuilds > 0 && (
-                      <Chip
-                        label={`${releaseStats.buildSuccessRate.toFixed(0)}%`}
-                        size="small"
-                        color={getSuccessRateColor(releaseStats.buildSuccessRate, releaseStats.totalBuilds > 0)}
-                      />
-                    )}
-                  </Box>
+                    <Typography variant="h4">
+                      {stats.throughput}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Velocity
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      (completed points)
+                    </Typography>
+                    <Typography variant="h4">
+                      {stats.velocity}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Avg Cycle Time
+                    </Typography>
+                    <Typography variant="h4">
+                      {formatDays(stats.avgCycleTime)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Avg Points per Issue
+                    </Typography>
+                    <Typography variant="h4">
+                      {stats.avgStoryPoints.toFixed(1)}
+                    </Typography>
+                  </Grid>
                 </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg Build Duration
-                  </Typography>
-                  <Typography variant="h4">
-                    {formatDuration(releaseStats.avgBuildDuration)}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Completion Distribution */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Completion Status
+                </Typography>
+                {stats.completionData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={stats.completionData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {stats.completionData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={COMPLETION_COLORS[entry.name as keyof typeof COMPLETION_COLORS]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `${value} issues`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography color="text.secondary">No data available</Typography>
+                )}
+              </CardContent>
+            </Card>
+
+
+            {/* Plan Distribution */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Planned vs Unplanned
+                </Typography>
+                {stats.planData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={stats.planData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {stats.planData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={PLAN_COLORS[entry.name as keyof typeof PLAN_COLORS]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `${value} issues`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography color="text.secondary">No data available</Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
         </Grid>
 
-        {/* Category Breakdown */}
+        {/* Right Column */}
         <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Issues by Category
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {Object.entries(stats.categories).map(([category, count]) => (
-                  <Chip
-                    key={category}
-                    label={`${category}: ${count}`}
-                    color="primary"
-                    variant="outlined"
-                  />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Release Statistics */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Release Statistics
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Releases
+                    </Typography>
+                    <Typography variant="h4">
+                      {releaseStats.totalReleases}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Successful Releases
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                      <Typography variant="h4">
+                        {releaseStats.successfulReleases}
+                      </Typography>
+                      {releaseStats.totalReleases > 0 && (
+                        <Chip
+                          label={`${releaseStats.releaseSuccessRate.toFixed(0)}%`}
+                          size="small"
+                          color={getSuccessRateColor(releaseStats.releaseSuccessRate, releaseStats.totalReleases > 0)}
+                        />
+                      )}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Builds
+                    </Typography>
+                    <Typography variant="h4">
+                      {releaseStats.totalBuilds}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Successful Builds
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                      <Typography variant="h4">
+                        {releaseStats.successfulBuilds}
+                      </Typography>
+                      {releaseStats.totalBuilds > 0 && (
+                        <Chip
+                          label={`${releaseStats.buildSuccessRate.toFixed(0)}%`}
+                          size="small"
+                          color={getSuccessRateColor(releaseStats.buildSuccessRate, releaseStats.totalBuilds > 0)}
+                        />
+                      )}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Avg Build Duration
+                    </Typography>
+                    <Typography variant="h4">
+                      {formatDuration(releaseStats.avgBuildDuration)}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Category Distribution */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Issues by Category
+                </Typography>
+                {stats.categoryData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={stats.categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {stats.categoryData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `${value} issues`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography color="text.secondary">No data available</Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
         </Grid>
 
-        {/* LLM Analysis */}
+        {/* AI Analysis - Full Width at Bottom */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
