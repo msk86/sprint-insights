@@ -10,7 +10,6 @@ interface TimelineEvent {
 export interface IssueFlags {
   isBlocked: boolean;
   isIncidentResponse: boolean;
-  isNotStarted: boolean;
   isBackAndForth: boolean;
   isUnplanned: boolean;
   isInherited: boolean;
@@ -33,26 +32,6 @@ export function isIssueBlocked(issue: Issue, _: SprintData): boolean {
   const blockRegex = /block/i;
   const historiesInSprint = getHistoriesInSprint(issue);
   return historiesInSprint.some(h => blockRegex.test(h.toString));
-}
-
-/**
- * Determines if an issue was not started during the sprint
- */
-export function isIssueNotStarted(issue: Issue, sprintData: SprintData): boolean {
-  const columns = sprintData.columns;
-  const startStatuses = [
-    columns[0]?.name.toLowerCase(),
-    'to do',
-    'backlog',
-    'selected for development'
-  ].filter(Boolean);
-  
-  const historiesInSprint = getHistoriesInSprint(issue);
-  
-  return (
-    historiesInSprint.length === 0 ||
-    startStatuses.includes(historiesInSprint[historiesInSprint.length - 1].toString.toLowerCase())
-  );
 }
 
 /**
@@ -177,7 +156,6 @@ export function calculateIssueFlags(issue: Issue, sprintData: SprintData): Issue
   return {
     isBlocked: isIssueBlocked(issue, sprintData),
     isIncidentResponse: isIncidentResponse(issue, sprintData),
-    isNotStarted: isIssueNotStarted(issue, sprintData),
     isBackAndForth: isIssueBackAndForth(issue, sprintData),
     isUnplanned: isIssueUnplanned(issue, sprintData),
     isInherited: isIssueInherited(issue, sprintData),
@@ -206,7 +184,6 @@ export function applyIssueFlagsToSprintData(sprintData: SprintData): SprintData 
 export const FLAG_FILTERS = [
   { key: 'isBlocked', label: 'Blocked' },
   { key: 'isIncidentResponse', label: 'Incident Response' },
-  { key: 'isNotStarted', label: 'Not Started' },
   { key: 'isBackAndForth', label: 'Back-and-forth' },
   { key: 'isUnplanned', label: 'Unplanned' },
   { key: 'isInherited', label: 'Inherited' },

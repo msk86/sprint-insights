@@ -6,8 +6,7 @@ export const CATEGORY_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#88
 export const COMPLETION_COLORS = {
   'Completed': '#4CAF50',
   'Closed': '#9E9E9E',
-  'Spillover': '#FF9800',
-  'Not Started': '#F44336'
+  'Spillover': '#FF9800'
 };
 export const PLAN_COLORS = {
   'Planned': '#2196F3',
@@ -90,8 +89,7 @@ export function calculateSprintStats(sprintData: SprintData): SprintStats {
   const completionCounts = {
     'Completed': 0,
     'Closed': 0,
-    'Spillover': 0,
-    'Not Started': 0
+    'Spillover': 0
   };
   
   sprintData.issues.forEach(issue => {
@@ -101,8 +99,6 @@ export function calculateSprintStats(sprintData: SprintData): SprintStats {
       completionCounts['Closed']++;
     } else if (issue.flags?.isSpillover) {
       completionCounts['Spillover']++;
-    } else if (issue.flags?.isNotStarted) {
-      completionCounts['Not Started']++;
     }
   });
   

@@ -232,7 +232,7 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                   <Typography variant="h6">
                     Completion Status
                   </Typography>
-                  <MuiTooltip title="Distribution of issues by completion status: Completed, Closed, Spillover, or Not Started" arrow>
+                  <MuiTooltip title="Distribution of issues by completion status: Completed, Closed, or Spillover" arrow>
                     <IconButton size="small" sx={{ p: 0 }}>
                       <InfoIcon sx={{ fontSize: 18 }} />
                     </IconButton>
@@ -250,6 +250,7 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
+                        isAnimationActive={false}
                       >
                         {stats.completionData.map((entry) => (
                           <Cell key={`cell-${entry.name}`} fill={COMPLETION_COLORS[entry.name as keyof typeof COMPLETION_COLORS]} />
@@ -399,6 +400,7 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
+                        isAnimationActive={false}
                       >
                         {stats.categoryData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
@@ -438,6 +440,7 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
+                        isAnimationActive={false}
                       >
                         {stats.planData.map((entry) => (
                           <Cell key={`cell-${entry.name}`} fill={PLAN_COLORS[entry.name as keyof typeof PLAN_COLORS]} />

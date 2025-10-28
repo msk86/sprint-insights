@@ -33,7 +33,6 @@ export interface IssueHistory {
 export interface IssueFlags {
   isBlocked: boolean;
   isIncidentResponse: boolean;
-  isNotStarted: boolean;
   isBackAndForth: boolean;
   isUnplanned: boolean;
   isInherited: boolean;
@@ -88,7 +87,6 @@ export interface SprintStats {
   completed: number;
   closed: number;
   spillover: number;
-  notStarted: number;
   unplanned: number;
   backAndForth: number;
   blocked: number;

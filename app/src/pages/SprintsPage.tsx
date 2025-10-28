@@ -67,7 +67,7 @@ const SprintsPage: React.FC = () => {
   const [teams, setTeams] = useState<TeamConfig[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [sprintIdentifier, setSprintIdentifier] = useState<string>('');
-  const [historyCount, setHistoryCount] = useState<number>(0);
+  const [historyCount, setHistoryCount] = useState<number>(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sprintData, setSprintData] = useState<SprintData | null>(null);

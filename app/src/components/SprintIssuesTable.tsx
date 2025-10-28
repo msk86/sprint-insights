@@ -50,7 +50,6 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
       if (issue.flags?.isUnplanned) notes.push('Unplanned');
       if (issue.flags?.isInherited) notes.push('Inherited');
       if (issue.flags?.isSpillover) notes.push('Spillover');
-      if (issue.flags?.isNotStarted) notes.push('Not Started');
       if (issue.flags?.isBackAndForth) notes.push('Back-and-forth');
       
       return {
