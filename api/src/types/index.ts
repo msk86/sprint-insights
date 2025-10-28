@@ -52,6 +52,7 @@ export interface Issue {
   workStartedAt?: Date;  // When work actually began (moved out of first column)
   completedAt?: Date;     // When work was completed (moved to last column)
   flags?: IssueFlags;
+  timeSpent?: Record<string, number>;  // Time spent in each board column (calculated by frontend)
 }
 
 export interface Build {
@@ -165,8 +166,37 @@ export interface LLMAnalysisRequest {
   }>;
 }
 
+export interface ChartConfiguration {
+  type: 'line' | 'bar' | 'pie' | 'area';
+  title: string;
+  dataTransform: string; // JavaScript function as string to transform data
+  config: {
+    xAxisKey?: string;
+    xAxisLabel?: string;
+    yAxisLabel?: string;
+    dataKeys: Array<{
+      key: string;
+      name: string;
+      color?: string;
+    }>;
+  };
+}
+
+export interface TableConfiguration {
+  title: string;
+  dataTransform: string; // JavaScript function as string to transform data
+  columns: Array<{
+    field: string;
+    headerName: string;
+    width?: number;
+    type?: 'string' | 'number' | 'date';
+  }>;
+}
+
 export interface LLMAnalysisResponse {
-  analysis: string;
-  insights: string[];
-  recommendations: string[];
+  analysis?: string;  // Optional - not needed for chart/table-only responses
+  insights?: string[];  // Optional - only for sprint analysis
+  recommendations?: string[];  // Optional - only for sprint analysis
+  chart?: ChartConfiguration;
+  table?: TableConfiguration;
 }

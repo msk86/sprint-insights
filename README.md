@@ -9,6 +9,7 @@ A single-page application for displaying and analyzing delivery iteration data w
 - **Historical Trend Analysis**: Multi-iteration data comparison and trend charts
 - **AI-Powered Analysis**: Sprint data analysis based on Claude Sonnet 4
 - **Free LLM Interaction**: Natural language conversation with AI assistant
+- **🆕 AI Chart Generation**: Ask the AI to create custom charts and visualizations on-demand!
 
 ## Tech Stack
 
@@ -112,6 +113,27 @@ sprint-insights/
 └── docker-compose.yml      # LocalStack configuration
 ```
 
+## AI Chart Generation 🎨
+
+The AI Assistant can now generate custom charts based on your requests! Simply ask for a visualization in natural language, and the AI will:
+
+1. Understand your data structure (sprints, issues, builds, etc.)
+2. Generate a chart configuration with data transformation logic
+3. Render the chart in real-time
+
+**Examples:**
+- "Show me a line chart of completed issues over the last 5 sprints"
+- "Create a pie chart of issue categories"
+- "Show build success rate trends across sprints"
+
+**Supported Chart Types:**
+- Line Charts (trends)
+- Bar Charts (comparisons)
+- Pie Charts (distributions)
+- Area Charts (cumulative data)
+
+📖 **[Read the Complete Chart Generation Guide](./CHART_GENERATION_GUIDE.md)** for detailed instructions and examples.
+
 ## API Endpoints
 
 ### Team Management
@@ -124,8 +146,8 @@ sprint-insights/
 - `GET /api/sprints` - Get sprint data (supports fuzzy search and index-based lookup)
 
 ### LLM Analysis
-- `POST /api/llm/analyze` - Sprint data analysis
-- `POST /api/llm/chat` - Free conversation
+- `POST /api/llm/analyze` - Sprint data analysis (returns optional chart configuration)
+- `POST /api/llm/chat` - Free conversation (returns optional chart configuration)
 
 ## Data Models
 

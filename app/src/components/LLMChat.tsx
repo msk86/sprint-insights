@@ -11,17 +11,22 @@ import {
   Alert,
 } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
-import { SprintData } from '../types';
+import { SprintData, ChartConfiguration, TableConfiguration } from '../types';
 import { llmApi } from '../services/api';
 import { formatTime } from '../utils/dateFormat';
 import { calculateSprintStats, calculateDoraMetrics } from '../services/stats';
 import { calculateBuildSummaryByPipeline } from '../utils/buildStats';
+import { calculateIssueTimeSpentOnColumns } from '../services/issue';
+import DynamicChart from './DynamicChart';
+import DynamicTable from './DynamicTable';
 
 interface ChatMessage {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  chart?: ChartConfiguration;
+  table?: TableConfiguration;
 }
 
 interface LLMChatProps {
@@ -89,15 +94,38 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
         buildSummaryByPipeline,
       };
 
+      // Enrich issues with timeSpent and filter out boundary events for LLM
+      const enrichIssuesWithTimeSpent = (data: SprintData) => {
+        const enrichedIssues = data.issues.map(issue => ({
+          ...issue,
+          timeSpent: calculateIssueTimeSpentOnColumns(issue, data),
+          // Filter out boundary events (inSprint: false) from history
+          history: issue.history.filter(h => h.inSprint)
+        }));
+        return { ...data, issues: enrichedIssues, builds: [] };
+      };
+
       // Prepare sprint data without builds for LLM
-      const sprintDataForLLM = { ...sprintData, builds: [] };
-      const historicalDataForLLM = historicalData?.map(sprint => ({ ...sprint, builds: [] }));
+      const sprintDataForLLM = enrichIssuesWithTimeSpent(sprintData);
+      const historicalDataForLLM = historicalData?.map(sprint => enrichIssuesWithTimeSpent(sprint));
 
       // Prepare chat history (exclude the current message that was just added)
-      const chatHistory = messages.map(msg => ({
-        role: msg.type,
-        content: msg.content
-      }));
+      const chatHistory = messages.map(msg => {
+        // For chart/table responses without analysis, use a descriptive message
+        let content = msg.content;
+        if (!content && msg.type === 'assistant') {
+          if (msg.chart) {
+            content = `Generated chart: ${msg.chart.title}`;
+          } else if (msg.table) {
+            content = `Generated table: ${msg.table.title}`;
+          }
+        }
+        
+        return {
+          role: msg.type,
+          content: content || 'No content'
+        };
+      });
 
       const response = await llmApi.freeChat(
         sprintDataForLLM, 
@@ -111,8 +139,11 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: response.analysis,
+        // Ignore analysis if chart or table is present
+        content: (response.chart || response.table) ? '' : (response.analysis || 'No response provided'),
         timestamp: new Date(),
+        chart: response.chart,
+        table: response.table,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -141,24 +172,44 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
         <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
           <List>
             {messages.map((message) => (
-              <ListItem key={message.id} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                <Box
-                  sx={{
-                    bgcolor: message.type === 'user' ? 'primary.main' : 'grey.100',
-                    color: message.type === 'user' ? 'white' : 'text.primary',
-                    p: 1.5,
-                    borderRadius: 2,
-                    maxWidth: '80%',
-                    alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {message.content}
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5 }}>
-                    {formatTime(message.timestamp)}
-                  </Typography>
-                </Box>
+              <ListItem key={message.id} sx={{ flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
+                {message.content && (
+                  <Box
+                    sx={{
+                      bgcolor: message.type === 'user' ? 'primary.main' : 'grey.100',
+                      color: message.type === 'user' ? 'white' : 'text.primary',
+                      p: 1.5,
+                      borderRadius: 2,
+                      maxWidth: '80%',
+                      alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {message.content}
+                    </Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5 }}>
+                      {formatTime(message.timestamp)}
+                    </Typography>
+                  </Box>
+                )}
+                {message.chart && message.type === 'assistant' && (
+                  <Box sx={{ width: '100%', mt: message.content ? 1 : 0 }}>
+                    <DynamicChart
+                      chartConfig={message.chart}
+                      sprintData={sprintData}
+                      historicalData={historicalData}
+                    />
+                  </Box>
+                )}
+                {message.table && message.type === 'assistant' && (
+                  <Box sx={{ width: '100%', mt: message.content ? 1 : 0 }}>
+                    <DynamicTable
+                      tableConfig={message.table}
+                      sprintData={sprintData}
+                      historicalData={historicalData}
+                    />
+                  </Box>
+                )}
               </ListItem>
             ))}
             {loading && (

@@ -14,7 +14,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 import { SprintData, Issue } from '../types';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
-import { formatDays, calculateBusinessDays } from '../utils/timeCalculation';
+import { formatDays } from '../utils/timeCalculation';
 import { calculateIssueTimeSpentOnColumns } from '../services/issue';
 
 interface SprintIssuesTableProps {
@@ -37,12 +37,9 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
     return sprintData.issues.map(issue => {
       const timeSpent = calculateIssueTimeSpentOnColumns(issue, sprintData);
       
-      // Calculate WIP duration (from workStartedAt to completedAt or now)
-      let wipDuration = 0;
-      if (issue.workStartedAt) {
-        const endTime = issue.completedAt || new Date();
-        wipDuration = calculateBusinessDays(new Date(issue.workStartedAt), endTime);
-      }
+      const wipDuration = timeSpent 
+        ? Object.values(timeSpent).reduce((sum, time) => sum + time, 0) 
+        : 0; 
       
       // Determine completion status
       let completion = 'No';

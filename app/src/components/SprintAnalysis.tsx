@@ -448,9 +448,11 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
                 </Box>
               ) : llmAnalysis ? (
                 <Box>
-                  <Typography variant="body1" paragraph>
-                    {llmAnalysis.analysis}
-                  </Typography>
+                  {llmAnalysis.analysis && (
+                    <Typography variant="body1" paragraph>
+                      {llmAnalysis.analysis}
+                    </Typography>
+                  )}
                   
                   {llmAnalysis.insights && llmAnalysis.insights.length > 0 && (
                     <Box mb={2}>
