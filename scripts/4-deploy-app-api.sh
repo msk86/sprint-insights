@@ -53,11 +53,9 @@ PRODUCTION_STATE_FILE="production.tfstate"
 # Get outputs
 cd "$ROOT_DIR/terraform"
 API_GATEWAY_URL=$(terraform output -state=$PRODUCTION_STATE_FILE -raw api_gateway_url)
-APP_BUCKET_NAME=$(terraform output -state=$PRODUCTION_STATE_FILE -raw app_bucket_name)
 CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -state=$PRODUCTION_STATE_FILE -raw cloudfront_distribution_id)
 WEBSITE_URL=$(terraform output -state=$PRODUCTION_STATE_FILE -raw website_url)
 LAMBDA_FUNCTION_NAME=$(terraform output -state=$PRODUCTION_STATE_FILE -raw lambda_function_name 2>/dev/null || echo "sprint-insights-api")
-S3_BUCKET_NAME=$(terraform output -state=$PRODUCTION_STATE_FILE -raw s3_bucket_name)
 cd "$ROOT_DIR"
 
 # ========================================
@@ -98,11 +96,31 @@ fi
 # Update env vars
 echo "  ➜ Updating Lambda environment variables..."
 cd "$ROOT_DIR/terraform"
-JIRA_BASE_URL=$(terraform console -state=$PRODUCTION_STATE_FILE <<< "var.jira_base_url" 2>/dev/null | tr -d '"' || echo "https://www.atlassian.net")
-BUILDKITE_ORG_SLUG=$(terraform console -state=$PRODUCTION_STATE_FILE <<< "var.buildkite_org_slug" 2>/dev/null | tr -d '"' || echo "org")
-ENCRYPTION_KEY=$(terraform console -state=$PRODUCTION_STATE_FILE <<< "var.encryption_key" 2>/dev/null | tr -d '"' || echo "default-key")
-BEDROCK_MODEL_ID=$(terraform console -state=$PRODUCTION_STATE_FILE <<< "var.bedrock_model_id" 2>/dev/null | tr -d '"' || echo "anthropic.claude-3-5-sonnet-20241022")
-BEDROCK_REGION=$(terraform console -state=$PRODUCTION_STATE_FILE <<< "var.bedrock_region" 2>/dev/null | tr -d '"' || echo "us-east-1")
+
+# Read values from production.tfvars
+TFVARS_FILE="production.tfvars"
+if [ ! -f "$TFVARS_FILE" ]; then
+    echo -e "${RED}❌ $TFVARS_FILE not found${NC}"
+    exit 1
+fi
+
+# Helper function to extract value from tfvars
+get_tfvar() {
+    local var_name=$1
+    local default_value=$2
+    local value=$(grep "^${var_name}" "$TFVARS_FILE" | cut -d'=' -f2- | tr -d ' "' | sed 's/#.*$//')
+    echo "${value:-$default_value}"
+}
+
+# Get all values from production.tfvars
+APP_BUCKET_NAME=$(get_tfvar "app_bucket_name" "sprint-insights-application")
+S3_BUCKET_NAME=$(get_tfvar "s3_bucket_name" "sprint-insights-analytics")
+JIRA_BASE_URL=$(get_tfvar "jira_base_url" "https://www.atlassian.net")
+BUILDKITE_ORG_SLUG=$(get_tfvar "buildkite_org_slug" "org")
+ENCRYPTION_KEY=$(get_tfvar "encryption_key" "default-key")
+BEDROCK_MODEL_ID=$(get_tfvar "bedrock_model_id" "anthropic.claude-3-5-sonnet-20241022")
+BEDROCK_REGION=$(get_tfvar "bedrock_region" "us-east-1")
+
 cd "$ROOT_DIR"
 
 $AWS_CMD lambda update-function-configuration \
