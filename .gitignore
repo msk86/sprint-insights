@@ -64,6 +64,11 @@ jspm_packages/
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
+tfplan
+*.tfvars
+
+# Lambda deployment packages
+lambda-deployment.zip
 
 # LocalStack
 .cursor/tools/sprint-data/

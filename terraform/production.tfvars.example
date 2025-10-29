@@ -1,0 +1,52 @@
+# Production Configuration Example
+# Copy this file to production.tfvars and update with your actual values
+# production.tfvars will be ignored by git for security
+
+use_localstack = false
+
+# Environment
+environment = "production"
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Lambda and API Gateway
+skip_lambda = false
+
+# IP Whitelist - Corporate IP addresses allowed to access the API
+# Add your organization's IP ranges here
+# 
+# IMPORTANT: API Gateway supports up to 320 IP ranges total
+# (automatically splits into multiple statements of 32 IPs each)
+#
+allowed_ip_ranges = [
+  # Example corporate IPs
+  "203.0.113.0/24",     # Office location 1
+  "198.51.100.0/24",    # Office location 2
+  "192.0.2.0/24",       # VPN access
+  
+  # Add your actual IP ranges below:
+  # "YOUR.IP.ADDRESS/32",
+  # "YOUR.IP.RANGE/24",
+]
+
+# Enable IP whitelisting (set to false to allow all IPs)
+enable_ip_whitelist = true
+
+# S3 Bucket Names (must be globally unique)
+# Update these to unique names for your deployment
+s3_bucket_name  = "sprint-insights-data"
+app_bucket_name = "sprint-insights-app"
+
+# API Gateway Stage
+api_gateway_stage = "production"
+
+# AWS Bedrock Configuration
+bedrock_region   = "us-east-1"
+bedrock_model_id = "anthropic.claude-3-5-sonnet-20241022"
+
+# Application Configuration
+jira_base_url       = "https://your-company.atlassian.net"
+buildkite_org_slug  = "your-org"
+encryption_key      = "your-secure-encryption-key-here"  # Change this in production!
+

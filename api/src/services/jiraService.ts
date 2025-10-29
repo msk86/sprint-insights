@@ -23,6 +23,7 @@ export class JiraService {
 
   constructor(private teamConfig: TeamConfig) {
     this.baseUrl = process.env.JIRA_BASE_URL || 'https://www.atlassian.net';
+    this.teamConfig = teamConfig;
   }
 
   private async makeJiraApiRequest(url: string, options: RequestInit = {}): Promise<any> {

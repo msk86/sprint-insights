@@ -11,5 +11,9 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  define: {
+    // Make environment variables available to the app
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || '/api')
   }
 })

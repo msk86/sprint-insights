@@ -8,6 +8,7 @@ export class BuildkiteService {
 
   constructor(private teamConfig: TeamConfig) {
     this.orgSlug = process.env.BUILDKITE_ORG_SLUG || 'o';
+    this.teamConfig = teamConfig;
   }
 
   async getBuilds(startDate: Date, endDate: Date): Promise<Build[]> {

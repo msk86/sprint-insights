@@ -42,6 +42,10 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, hi
         ${tableConfig.dataTransform}
       `);
 
+      // Export transform function to window for debugging
+      (window as any).dataTransform = transformFn;
+      console.log('🐛 Debug: window.dataTransform exported (table)');
+
       const result = transformFn(allSprints);
       
       // Add id field if not present

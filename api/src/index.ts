@@ -10,12 +10,15 @@ dotenv.config({ path: process.env.ENV_FILE || '.env' });
 
 const app = express();
 
-// Set server timeout to 60 seconds for long-running requests
-app.use((req, res, next) => {
-  req.setTimeout(60000); // 60 seconds
-  res.setTimeout(60000); // 60 seconds
-  next();
-});
+// Set server timeout to 60 seconds for long-running requests (only for non-Lambda environments)
+// In Lambda, timeout is controlled by Lambda configuration
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    req.setTimeout(60000); // 60 seconds
+    res.setTimeout(60000); // 60 seconds
+    next();
+  });
+}
 
 // Middleware
 app.use(helmet());

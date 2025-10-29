@@ -106,7 +106,7 @@ const SprintIssuesTable: React.FC<SprintIssuesTableProps> = ({ sprintData }) => 
       },
       {
         field: 'wipDuration',
-        headerName: 'WIP Duration',
+        headerName: 'Total Duration',
         width: 120,
         type: 'number',
         align: 'center',

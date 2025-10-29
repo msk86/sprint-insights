@@ -61,6 +61,10 @@ const DynamicChart: React.FC<DynamicChartProps> = ({ chartConfig, sprintData, hi
         ${chartConfig.dataTransform}
       `);
 
+      // Export allSprints & transform function to window for debugging
+      (window as any).dataTransform = transformFn;
+      (window as any).allSprints = allSprints;
+
       const result = transformFn(allSprints);
       return { chartData: result, error: null };
     } catch (err) {

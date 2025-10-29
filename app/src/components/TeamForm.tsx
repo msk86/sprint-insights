@@ -4,10 +4,6 @@ import {
   TextField,
   Button,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
 import { TeamConfig } from '../types';
 

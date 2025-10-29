@@ -10,9 +10,7 @@
     "build": "npm run build:api && npm run build:app",
     "build:api": "cd api && npm run build",
     "build:app": "cd app && npm run build",
-    "deploy": "npm run deploy:api && npm run deploy:app",
-    "deploy:api": "cd api && npm run deploy",
-    "deploy:app": "cd app && npm run deploy"
+    "deploy:production": "./scripts/3-deploy-production.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
