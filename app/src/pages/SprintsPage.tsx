@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -80,6 +80,9 @@ const SprintsPage: React.FC = () => {
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [selectedFlags, setSelectedFlags] = useState<string[]>([]);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [chatPanelHeight, setChatPanelHeight] = useState<number>(0);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   // Get unique sub-categories from sprint data
   const subCategories = useMemo(() => {
@@ -124,6 +127,60 @@ const SprintsPage: React.FC = () => {
   useEffect(() => {
     loadTeams();
   }, []);
+
+  // Smooth dynamic chat panel height calculation
+  useEffect(() => {
+    const calculateHeight = () => {
+      if (!chatPanelRef.current || isChatCollapsed) return;
+
+      const rect = chatPanelRef.current.getBoundingClientRect();
+      const topPosition = rect.top;
+      const viewportHeight = window.innerHeight;
+      const bottomPadding = 16;
+      
+      // Calculate available height from current position to bottom of viewport
+      const availableHeight = viewportHeight - topPosition - bottomPadding;
+      const newHeight = Math.max(400, Math.min(availableHeight, viewportHeight - 40));
+
+      setChatPanelHeight(prev => {
+        // Only update if difference is significant (reduces re-renders)
+        if (Math.abs(prev - newHeight) >= 5) {
+          return newHeight;
+        }
+        return prev;
+      });
+    };
+
+    // Initial calculation
+    calculateHeight();
+
+    // Smooth scroll handler with requestAnimationFrame
+    const handleScroll = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      rafRef.current = requestAnimationFrame(calculateHeight);
+    };
+
+    // Resize handler
+    const handleResize = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      rafRef.current = requestAnimationFrame(calculateHeight);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isChatCollapsed, sprintData]);
 
   const loadTeams = async () => {
     try {
@@ -500,19 +557,30 @@ const SprintsPage: React.FC = () => {
           </Box>
 
           {/* Chat Panel with Collapse/Expand */}
-          {!isChatCollapsed && (
-            <Box sx={{ width: 420, maxWidth: 420, flexShrink: 0 }}>
-              <Paper 
-                sx={{ 
-                  position: 'sticky',
-                  top: 16,
-                  height: 'calc(100vh - 232px)',
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
-                }}
-              >
+          <Box 
+            sx={{ 
+              width: isChatCollapsed ? 0 : 420, 
+              maxWidth: 420, 
+              flexShrink: 0,
+              opacity: isChatCollapsed ? 0 : 1,
+              visibility: isChatCollapsed ? 'hidden' : 'visible',
+              transition: 'width 0.3s ease-in-out, opacity 0.2s ease-in-out',
+              overflow: isChatCollapsed ? 'hidden' : 'visible'
+            }} 
+            ref={chatPanelRef}
+          >
+            <Paper 
+              sx={{ 
+                position: 'sticky',
+                top: 16,
+                height: chatPanelHeight > 0 ? `${chatPanelHeight}px` : 'calc(100vh - 232px)',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                transition: 'height 0.15s ease-out'
+              }}
+            >
                 <Box sx={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
@@ -523,12 +591,12 @@ const SprintsPage: React.FC = () => {
                   borderColor: 'divider'
                 }}>
                   <Typography variant="h6">AI Assistant</Typography>
-                  <Tooltip title="Hide chat">
+                  <Tooltip title={isChatCollapsed ? "Show chat" : "Hide chat"}>
                     <IconButton 
                       size="small" 
-                      onClick={() => setIsChatCollapsed(true)}
+                      onClick={() => setIsChatCollapsed(!isChatCollapsed)}
                     >
-                      <ChevronRightIcon />
+                      {isChatCollapsed ? <ChevronLeftIcon /> : <ChevronRightIcon />}
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -541,9 +609,8 @@ const SprintsPage: React.FC = () => {
                 </Box>
               </Paper>
             </Box>
-          )}
 
-          {/* Expand Button when Chat is Collapsed */}
+          {/* Floating Expand Button when Chat is Collapsed */}
           {isChatCollapsed && (
             <Box sx={{ position: 'fixed', right: 16, top: '50%', transform: 'translateY(-50%)', zIndex: 1000 }}>
               <Tooltip title="Show AI Assistant" placement="left">
@@ -551,11 +618,12 @@ const SprintsPage: React.FC = () => {
                   color="primary"
                   onClick={() => setIsChatCollapsed(false)}
                   sx={{
-                    bgcolor: 'background.paper',
-                    boxShadow: 2,
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    boxShadow: 3,
                     '&:hover': {
-                      bgcolor: 'background.paper',
-                      boxShadow: 4,
+                      bgcolor: 'primary.dark',
+                      boxShadow: 6,
                     }
                   }}
                 >
