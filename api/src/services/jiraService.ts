@@ -133,7 +133,8 @@ export class JiraService {
       index: index,
       state: sprint.state,
       start: new Date(sprint.startDate),
-      end: new Date(sprint.completeDate || sprint.endDate)
+      end: new Date(sprint.completeDate || sprint.endDate),
+      goal: sprint.goal
     };
   }
 

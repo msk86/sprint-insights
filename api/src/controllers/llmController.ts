@@ -42,4 +42,25 @@ export class LLMController {
       res.status(500).json({ error: 'Failed to process chat request' });
     }
   }
+
+  async visualize(req: Request, res: Response): Promise<void> {
+    try {
+      const request: LLMAnalysisRequest = {
+        sprintData: req.body.sprintData,
+        historicalData: req.body.historicalData,
+        userMessage: req.body.userMessage,
+        analysisType: 'free_chat',
+        stats: req.body.stats,
+        chatHistory: req.body.chatHistory,
+        historicalStats: req.body.historicalStats
+      };
+
+      const llmService = new LLMService();
+      const response = await llmService.visualize(request);
+      res.json(response);
+    } catch (error) {
+      console.error('Error in visualization:', error);
+      res.status(500).json({ error: 'Failed to process visualization request' });
+    }
+  }
 }

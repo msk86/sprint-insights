@@ -14,6 +14,7 @@ export interface SprintMeta {
   state: string;
   start: Date;
   end: Date;
+  goal?: string;
 }
 
 export interface SprintColumn {

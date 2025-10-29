@@ -22,6 +22,7 @@ router.get('/sprints', (req, res) => sprintController.getSprintData(req, res));
 // LLM analysis routes
 router.post('/llm/analyze', (req, res) => llmController.analyzeSprint(req, res));
 router.post('/llm/chat', (req, res) => llmController.freeChat(req, res));
+router.post('/llm/visualize', (req, res) => llmController.visualize(req, res));
 
 // Health check
 router.get('/health', (req, res) => {

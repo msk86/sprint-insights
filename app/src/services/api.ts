@@ -89,6 +89,25 @@ export const llmApi = {
       historicalStats
     });
     return response.data;
+  },
+
+  visualize: async (
+    sprintData: SprintData, 
+    userMessage: string,
+    stats?: any,
+    chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
+    historicalData?: SprintData[],
+    historicalStats?: any[]
+  ): Promise<LLMAnalysisResponse> => {
+    const response = await api.post('/llm/visualize', {
+      sprintData,
+      userMessage,
+      stats,
+      chatHistory,
+      historicalData,
+      historicalStats
+    });
+    return response.data;
   }
 };
 

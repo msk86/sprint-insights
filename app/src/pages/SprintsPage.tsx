@@ -396,6 +396,11 @@ const SprintsPage: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                         <strong>Duration:</strong> {formatDateRange(sprintData.sprint.start, sprintData.sprint.end)}
                       </Typography>
+                      {sprintData.sprint.goal && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          <strong>Goal:</strong> {sprintData.sprint.goal}
+                        </Typography>
+                      )}
                     </Box>
                   </CardContent>
                 </Card>
