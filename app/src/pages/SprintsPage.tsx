@@ -232,8 +232,11 @@ const SprintsPage: React.FC = () => {
       const sprintStats = calculateSprintStats(currentSprintWithFlags);
       const doraMetrics = calculateDoraMetrics(currentSprintWithFlags);
       
-      // Calculate build/release summary per pipeline
-      const buildSummaryByPipeline = calculateBuildSummaryByPipeline(currentSprintWithFlags.builds);
+      // Filter builds to only include those in sprint for statistics
+      const inSprintBuilds = currentSprintWithFlags.builds.filter(b => b.inSprint);
+      
+      // Calculate build/release summary per pipeline (only for in-sprint builds)
+      const buildSummaryByPipeline = calculateBuildSummaryByPipeline(inSprintBuilds);
       
       const stats = {
         totalIssues: currentSprintWithFlags.issues.length,
@@ -242,12 +245,12 @@ const SprintsPage: React.FC = () => {
         completedPoints: sprintStats.velocity,
         backAndForthIssues: currentSprintWithFlags.issues.filter(issue => issue.flags?.isBackAndForth).length,
         incidentIssues: currentSprintWithFlags.issues.filter(issue => issue.flags?.isIncidentResponse).length,
-        totalBuilds: currentSprintWithFlags.builds.length,
-        totalReleases: currentSprintWithFlags.builds.filter(b => b.isRelease).length,
-        successfulBuilds: currentSprintWithFlags.builds.filter(b => b.status === 'passed').length,
-        successfulReleases: currentSprintWithFlags.builds.filter(b => b.isRelease && b.status === 'passed').length,
-        avgBuildDuration: currentSprintWithFlags.builds.length > 0 
-          ? currentSprintWithFlags.builds.reduce((sum, b) => sum + b.duration, 0) / currentSprintWithFlags.builds.length / 60
+        totalBuilds: inSprintBuilds.length,
+        totalReleases: inSprintBuilds.filter(b => b.isRelease).length,
+        successfulBuilds: inSprintBuilds.filter(b => b.status === 'passed').length,
+        successfulReleases: inSprintBuilds.filter(b => b.isRelease && b.status === 'passed').length,
+        avgBuildDuration: inSprintBuilds.length > 0 
+          ? inSprintBuilds.reduce((sum, b) => sum + b.duration, 0) / inSprintBuilds.length / 60
           : 0,
         deploymentFrequency: doraMetrics.deploymentFrequency,
         medianLeadTime: doraMetrics.avgLeadTime,
@@ -261,8 +264,11 @@ const SprintsPage: React.FC = () => {
         const histStats = calculateSprintStats(sprint);
         const histDora = calculateDoraMetrics(sprint);
         
-        // Calculate build/release summary per pipeline for historical sprint
-        const buildSummaryByPipeline = calculateBuildSummaryByPipeline(sprint.builds);
+        // Filter builds to only include those in sprint for statistics
+        const inSprintBuilds = sprint.builds.filter(b => b.inSprint);
+        
+        // Calculate build/release summary per pipeline for historical sprint (only for in-sprint builds)
+        const buildSummaryByPipeline = calculateBuildSummaryByPipeline(inSprintBuilds);
         
         return {
           sprintIndex: sprint.sprint.index,
@@ -273,12 +279,12 @@ const SprintsPage: React.FC = () => {
           completedPoints: histStats.velocity,
           backAndForthIssues: sprint.issues.filter(issue => issue.flags?.isBackAndForth).length,
           incidentIssues: sprint.issues.filter(issue => issue.flags?.isIncidentResponse).length,
-          totalBuilds: sprint.builds.length,
-          totalReleases: sprint.builds.filter(b => b.isRelease).length,
-          successfulBuilds: sprint.builds.filter(b => b.status === 'passed').length,
-          successfulReleases: sprint.builds.filter(b => b.isRelease && b.status === 'passed').length,
-          avgBuildDuration: sprint.builds.length > 0 
-            ? sprint.builds.reduce((sum, b) => sum + b.duration, 0) / sprint.builds.length / 60
+          totalBuilds: inSprintBuilds.length,
+          totalReleases: inSprintBuilds.filter(b => b.isRelease).length,
+          successfulBuilds: inSprintBuilds.filter(b => b.status === 'passed').length,
+          successfulReleases: inSprintBuilds.filter(b => b.isRelease && b.status === 'passed').length,
+          avgBuildDuration: inSprintBuilds.length > 0 
+            ? inSprintBuilds.reduce((sum, b) => sum + b.duration, 0) / inSprintBuilds.length / 60
             : 0,
           deploymentFrequency: histDora.deploymentFrequency,
           medianLeadTime: histDora.avgLeadTime,

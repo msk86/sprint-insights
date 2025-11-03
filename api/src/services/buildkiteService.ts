@@ -20,13 +20,30 @@ export class BuildkiteService {
     }
     
     const pipelines = this.teamConfig.BUILDKITE_PIPELINES.split(',').map(p => p.trim());
+    const pipelinesWithoutBuilds: string[] = [];
     
     for (const pipelineName of pipelines) {
       try {
         const pipelineBuilds = await this.fetchPipelineBuilds(pipelineName, startDate, endDate);
-        builds.push(...pipelineBuilds);
+        if (pipelineBuilds.length > 0) {
+          builds.push(...pipelineBuilds);
+        } else {
+          pipelinesWithoutBuilds.push(pipelineName);
+        }
       } catch (error) {
         console.error(`Error fetching builds for pipeline ${pipelineName}:`, error);
+      }
+    }
+    
+    // For pipelines without builds in the sprint, fetch the latest build before sprint start
+    for (const pipelineName of pipelinesWithoutBuilds) {
+      try {
+        const latestBuild = await this.fetchLatestBuildBeforeDate(pipelineName, startDate);
+        if (latestBuild) {
+          builds.push(latestBuild);
+        }
+      } catch (error) {
+        console.error(`Error fetching latest build before sprint for pipeline ${pipelineName}:`, error);
       }
     }
     
@@ -55,10 +72,42 @@ export class BuildkiteService {
     }
 
     const buildsData = await response.json() as any[];
-    return buildsData.map((build: any) => this.transformBuild(build, pipelineName));
+    return buildsData.map((build: any) => this.transformBuild(build, pipelineName, true));
   }
 
-  private transformBuild(buildData: any, pipelineName: string): Build {
+  private async fetchLatestBuildBeforeDate(pipelineName: string, beforeDate: Date): Promise<Build | null> {
+    console.log(`Fetching latest build before ${beforeDate.toISOString()} for pipeline: ${pipelineName}`);
+    
+    const url = `${this.baseUrl}/organizations/${this.orgSlug}/pipelines/${pipelineName}/builds`;
+    const params = new URLSearchParams({
+      created_to: beforeDate.toISOString(),
+      per_page: '1',
+      page: '1'
+    });
+
+    const response = await fetch(`${url}?${params}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.teamConfig.BUILDKITE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`HTTP ${response.status}: ${response.statusText} when getting latest build before date for ${pipelineName}`);
+      return null;
+    }
+
+    const buildsData = await response.json() as any[];
+    if (buildsData.length === 0) {
+      console.log(`No builds found before ${beforeDate.toISOString()} for pipeline: ${pipelineName}`);
+      return null;
+    }
+
+    return this.transformBuild(buildsData[0], pipelineName, false);
+  }
+
+  private transformBuild(buildData: any, pipelineName: string, inSprint: boolean): Build {
     const deployments = this.extractProductionDeployments(buildData.jobs || []);
     
     return {
@@ -73,7 +122,8 @@ export class BuildkiteService {
       repository: buildData.pipeline?.repository || '',
       deployments,
       isRelease: deployments.length > 0,
-      isReleaseSuccess: deployments.length > 0 && deployments.every(deployment => deployment.status === 'success')
+      isReleaseSuccess: deployments.length > 0 && deployments.every(deployment => deployment.status === 'success'),
+      inSprint
     };
   }
 

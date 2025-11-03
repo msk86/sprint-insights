@@ -129,17 +129,21 @@ export function calculateSprintStats(sprintData: SprintData): SprintStats {
 
 /**
  * Calculate release statistics including build success rates and durations
+ * Only counts builds that occurred during the sprint (inSprint = true)
  */
 export function calculateReleaseStats(sprintData: SprintData): ReleaseStats {
-  const totalBuilds = sprintData.builds.length;
-  const successfulBuilds = sprintData.builds.filter(b => b.status === 'passed').length;
+  // Filter to only include builds that occurred during the sprint
+  const inSprintBuilds = sprintData.builds.filter(b => b.inSprint);
+  
+  const totalBuilds = inSprintBuilds.length;
+  const successfulBuilds = inSprintBuilds.filter(b => b.status === 'passed').length;
   const buildSuccessRate = totalBuilds > 0 ? (successfulBuilds / totalBuilds) * 100 : 0;
   
-  const totalReleases = sprintData.builds.filter(b => b.isRelease).length;
-  const successfulReleases = sprintData.builds.filter(b => b.isRelease && b.status === 'passed').length;
+  const totalReleases = inSprintBuilds.filter(b => b.isRelease).length;
+  const successfulReleases = inSprintBuilds.filter(b => b.isRelease && b.status === 'passed').length;
   const releaseSuccessRate = totalReleases > 0 ? (successfulReleases / totalReleases) * 100 : 0;
   
-  const totalBuildDuration = sprintData.builds.reduce((sum, b) => sum + b.duration, 0);
+  const totalBuildDuration = inSprintBuilds.reduce((sum, b) => sum + b.duration, 0);
   const avgBuildDuration = totalBuilds > 0 ? totalBuildDuration / totalBuilds : 0;
   
   return {
@@ -159,9 +163,12 @@ export function calculateReleaseStats(sprintData: SprintData): ReleaseStats {
  * - Lead Time for Changes: Time from code commit to production (using issue cycle time as proxy)
  * - Change Failure Rate: Percentage of deployments causing incidents
  * - Mean Time to Restore: Time to recover from incidents
+ * Only counts builds that occurred during the sprint (inSprint = true)
  */
 export function calculateDoraMetrics(sprintData: SprintData): DoraMetrics {
-  const successfulReleases = sprintData.builds.filter(b => b.isRelease && b.status === 'passed');
+  // Filter to only include builds that occurred during the sprint
+  const inSprintBuilds = sprintData.builds.filter(b => b.inSprint);
+  const successfulReleases = inSprintBuilds.filter(b => b.isRelease && b.status === 'passed');
   
   // Calculate business days in sprint
   const sprintStart = new Date(sprintData.sprint.start);

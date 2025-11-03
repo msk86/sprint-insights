@@ -69,6 +69,7 @@ export interface Build {
   deployments: Deployment[];
   isRelease: boolean;
   isReleaseSuccess: boolean;
+  inSprint: boolean;
 }
 
 export interface Deployment {

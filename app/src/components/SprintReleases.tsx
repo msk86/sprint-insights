@@ -28,6 +28,7 @@ interface PipelineStats {
   avgBuildDuration: string;
   totalReleases: number;
   successReleases: number;
+  latestBuildTimestamp: string;
   builds: Build[];
 }
 
@@ -65,34 +66,60 @@ const SprintReleases: React.FC<SprintReleasesProps> = ({ sprintData }) => {
           avgBuildDuration: '0s',
           totalReleases: 0,
           successReleases: 0,
+          latestBuildTimestamp: '',
           builds: []
         });
       }
 
       const stats = statsMap.get(key)!;
       stats.builds.push(build);
-      stats.totalBuilds++;
       
-      if (build.status === 'passed') {
-        stats.successBuilds++;
-      }
-      
-      if (build.isRelease) {
-        stats.totalReleases++;
-        if (build.isReleaseSuccess) {
-          stats.successReleases++;
+      // Only count builds that occurred during the sprint for statistics
+      if (build.inSprint) {
+        stats.totalBuilds++;
+        
+        if (build.status === 'passed') {
+          stats.successBuilds++;
+        }
+        
+        if (build.isRelease) {
+          stats.totalReleases++;
+          if (build.isReleaseSuccess) {
+            stats.successReleases++;
+          }
         }
       }
     });
 
-    // Calculate average build duration
+    // Calculate average build duration and find latest build timestamp
     statsMap.forEach(stats => {
-      const totalDuration = stats.builds.reduce((sum, build) => sum + build.duration, 0);
-      const avgSeconds = stats.builds.length > 0 ? totalDuration / stats.builds.length : 0;
+      // Only calculate average duration for builds in sprint
+      const inSprintBuilds = stats.builds.filter(b => b.inSprint);
+      const totalDuration = inSprintBuilds.reduce((sum, build) => sum + build.duration, 0);
+      const avgSeconds = inSprintBuilds.length > 0 ? totalDuration / inSprintBuilds.length : 0;
       stats.avgBuildDuration = formatDuration(avgSeconds);
+      
+      // Find the latest build timestamp (most recent startedAt) from ALL builds (including pre-sprint)
+      if (stats.builds.length > 0) {
+        const latestBuild = stats.builds.reduce((latest, current) => {
+          return new Date(current.startedAt) > new Date(latest.startedAt) ? current : latest;
+        });
+        stats.latestBuildTimestamp = latestBuild.startedAt;
+      }
     });
 
-    return Array.from(statsMap.values());
+    // Sort by latest build timestamp (most recent first)
+    return Array.from(statsMap.values()).sort((a, b) => {
+      // If both have timestamps, sort by date
+      if (a.latestBuildTimestamp && b.latestBuildTimestamp) {
+        return new Date(b.latestBuildTimestamp).getTime() - new Date(a.latestBuildTimestamp).getTime();
+      }
+      // If only one has a timestamp, prioritize the one with a timestamp
+      if (a.latestBuildTimestamp) return -1;
+      if (b.latestBuildTimestamp) return 1;
+      // If neither has a timestamp, maintain original order
+      return 0;
+    });
   }, [sprintData.builds]);
 
   const columns: GridColDef[] = [
@@ -155,6 +182,34 @@ const SprintReleases: React.FC<SprintReleasesProps> = ({ sprintData }) => {
       headerAlign: 'center',
     },
     {
+      field: 'latestBuildTimestamp',
+      headerName: 'Latest Build',
+      width: 180,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        if (!params.value) return '-';
+        
+        const latestBuildDate = new Date(params.value as string);
+        const sprintEndDate = new Date(sprintData.sprint.end);
+        const daysDiff = Math.floor((sprintEndDate.getTime() - latestBuildDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Determine color based on days difference
+        let colorStyle = {};
+        if (daysDiff >= 90) {
+          colorStyle = { color: 'error.main' }; // Red if 90+ days old
+        } else if (daysDiff >= 30) {
+          colorStyle = { color: 'warning.main' }; // Amber if 30+ days old
+        }
+        
+        return (
+          <Typography variant="body2" sx={colorStyle}>
+            {formatDateTime(latestBuildDate)}
+          </Typography>
+        );
+      },
+    },
+    {
       field: 'totalReleases',
       headerName: 'Total Releases',
       width: 130,
@@ -192,17 +247,24 @@ const SprintReleases: React.FC<SprintReleasesProps> = ({ sprintData }) => {
       sortable: false,
       align: 'center',
       headerAlign: 'center',
-      renderCell: (params) => (
-        <IconButton
-          size="small"
-          onClick={() => {
-            setSelectedPipeline(params.row);
-            setDialogOpen(true);
-          }}
-        >
-          <VisibilityIcon />
-        </IconButton>
-      ),
+      renderCell: (params) => {
+        // Only show action button if pipeline has builds in sprint
+        if (params.row.totalBuilds === 0) {
+          return '-';
+        }
+        
+        return (
+          <IconButton
+            size="small"
+            onClick={() => {
+              setSelectedPipeline(params.row);
+              setDialogOpen(true);
+            }}
+          >
+            <VisibilityIcon />
+          </IconButton>
+        );
+      },
     },
   ];
 
@@ -282,7 +344,7 @@ const SprintReleases: React.FC<SprintReleasesProps> = ({ sprintData }) => {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Release Pipeline Statistics ({pipelineStats.length} pipelines, {sprintData.builds.length} builds)
+        Release Pipeline Statistics ({pipelineStats.length} pipelines, {sprintData.builds.filter(b => b.inSprint).length} builds)
       </Typography>
       
       <Box sx={{ width: '100%' }}>
@@ -315,15 +377,17 @@ const SprintReleases: React.FC<SprintReleasesProps> = ({ sprintData }) => {
                 Repository: {selectedPipeline.repository}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
-                Total Builds: {selectedPipeline.totalBuilds}
+                Total Builds in Sprint: {selectedPipeline.totalBuilds}
               </Typography>
               
               <Box sx={{ height: 600, width: '100%' }}>
                 <DataGrid
-                  rows={selectedPipeline.builds.map((build, index) => ({
-                    id: `${build.pipelineName}-${build.buildNumber}-${index}`,
-                    ...build
-                  }))}
+                  rows={selectedPipeline.builds
+                    .filter(build => build.inSprint)
+                    .map((build, index) => ({
+                      id: `${build.pipelineName}-${build.buildNumber}-${index}`,
+                      ...build
+                    }))}
                   columns={buildColumns}
                   pageSizeOptions={[30, 50]}
                   initialState={{
