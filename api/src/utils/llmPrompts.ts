@@ -287,6 +287,9 @@ const specificSprint = allSprints.find(s => s.sprint.name.toLowerCase().includes
 // Find an Issue and its history by key (Issue might across multiple sprints so you must not pick only one item in the array):
 const issues = allSprints.map(s => s.issues.find(i => i.key.toLowerCase() === 'PX-123'.toLowerCase()));  // Find by key
 const histories = issues.map(i => i.history).flat();  // Get the history of the issue
+
+// Find All Builds 
+const builds = allSprints.map(s => s.builds).flat().filter(b => b.inSprint);
 \`\`\`
 
 </section>

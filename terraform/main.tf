@@ -103,6 +103,7 @@ resource "aws_lambda_function" "sprint_insights_api" {
       JIRA_BASE_URL      = var.jira_base_url
       BUILDKITE_ORG_SLUG = var.buildkite_org_slug
       ENCRYPTION_KEY     = var.encryption_key
+      API_VERSION        = var.api_version
     }
   }
 

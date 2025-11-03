@@ -89,3 +89,9 @@ variable "encryption_key" {
   sensitive   = true
   default     = "default-key-change-in-production"
 }
+
+variable "api_version" {
+  description = "API version for cache invalidation and versioning"
+  type        = string
+  default     = "v1"
+}

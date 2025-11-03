@@ -50,3 +50,6 @@ jira_base_url       = "https://your-company.atlassian.net"
 buildkite_org_slug  = "your-org"
 encryption_key      = "your-secure-encryption-key-here"  # Change this in production!
 
+# API Version - increment to invalidate cache when data structure changes
+api_version = "v1"
+

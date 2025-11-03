@@ -187,6 +187,7 @@ ENCRYPTION_KEY=your-32-character-secret-key-here!
 JIRA_BASE_URL=https://your-domain.atlassian.net
 BUILDKITE_ORG_SLUG=your-org-slug
 FRONTEND_URL=http://localhost:3000
+API_VERSION=v1
 ```
 
 ### Production Environment
@@ -199,6 +200,7 @@ ENCRYPTION_KEY=your-32-character-secret-key
 JIRA_BASE_URL=https://your-domain.atlassian.net
 BUILDKITE_ORG_SLUG=your-org-slug
 FRONTEND_URL=https://your-frontend-domain.com
+API_VERSION=v1
 ```
 
 ## Development Guide
@@ -253,6 +255,8 @@ The script will:
 - When testing with fresh data
 - If cached data appears stale or corrupted
 - After changing team configurations
+
+**Note:** The `API_VERSION` environment variable is automatically included in cache file names. Increment the version (e.g., from `v1` to `v2`) when making breaking changes to the data structure to invalidate old cache files without manually deleting them.
 
 ## Troubleshooting
 

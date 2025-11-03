@@ -29,15 +29,16 @@ const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'sprint-insights-data';
  */
 function generateSprintCacheKey(teamConfig: TeamConfig, sprintIndex: number, isActive: boolean = false): string {
   const teamSlug = teamConfig.team.toLowerCase().replace(/\W/g, '-');
+  const apiVersion = process.env.API_VERSION || 'v1';
   
   // For active sprints, include today's date in the cache key for daily caching
   if (isActive) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    return `sprint-data/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}_date-${today}.json`;
+    return `sprint-data/${apiVersion}/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}_date-${today}.json`;
   }
   
   // For closed sprints, use permanent cache key
-  return `sprint-data/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}.json`;
+  return `sprint-data/${apiVersion}/${teamSlug}_${teamConfig.JIRA_PROJECT}_${teamConfig.JIRA_BOARD_ID}_index-${sprintIndex}.json`;
 }
 
 /**
