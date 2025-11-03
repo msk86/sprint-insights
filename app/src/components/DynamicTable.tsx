@@ -31,10 +31,10 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, hi
         return { ...sprint, issues: enrichedIssues };
       };
 
-      // Create allSprints array (current sprint is LAST)
+      // Create allSprints array (current sprint is first)
       const enrichedHistorical = historicalData?.map(enrichSprint) || [];
       const enrichedCurrent = enrichSprint(sprintData);
-      const allSprints = [...enrichedHistorical, enrichedCurrent];
+      const allSprints = [enrichedCurrent, ...enrichedHistorical];
 
       // Execute the data transformation function
       // eslint-disable-next-line no-new-func
