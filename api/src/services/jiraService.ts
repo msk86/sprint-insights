@@ -93,8 +93,8 @@ export class JiraService {
     // Get recent sprints to find the target sprint
     const recentParams = new URLSearchParams({
       state: "active,closed",
-      startAt: (total - 10).toString(),
-      maxResults: "10"
+      startAt: (total - 12).toString(),
+      maxResults: "12"
     });
     const recentData = await this.makeJiraApiRequest(
       `${this.baseUrl}/rest/agile/1.0/board/${this.teamConfig.JIRA_BOARD_ID}/sprint?${recentParams}`

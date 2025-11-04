@@ -84,7 +84,7 @@ resource "aws_lambda_function" "sprint_insights_api" {
   role             = aws_iam_role.lambda_role[0].arn
   handler          = "index.handler"
   runtime          = "nodejs22.x"
-  timeout          = 30
+  timeout          = 120
 
   tags = merge(
     local.common_tags,

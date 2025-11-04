@@ -79,4 +79,62 @@ export class SprintController {
     }
   }
 
+  async getSprintDataWait(req: Request, res: Response): Promise<void> {
+    try {
+      const { team, sprintIdentifier, identifierType } = req.query;
+      
+      if (!team || !sprintIdentifier || !identifierType) {
+        res.status(400).json({ error: 'Team, sprintIdentifier, and identifierType are required' });
+        return;
+      }
+      
+      // Validate identifierType
+      if (identifierType !== 'index' && identifierType !== 'name') {
+        res.status(400).json({ error: 'identifierType must be either "index" or "name"' });
+        return;
+      }
+      
+      // Get team configuration
+      const teams = await getTeamConfigs();
+      const teamConfig = teams.find(t => t.team === team);
+      
+      if (!teamConfig) {
+        res.status(404).json({ error: 'Team not found' });
+        return;
+      }
+      
+      // Decrypt tokens for API calls
+      const decryptedTeamConfig: TeamConfig = {
+        ...teamConfig,
+        JIRA_TOKEN: decrypt(teamConfig.JIRA_TOKEN),
+        BUILDKITE_TOKEN: decrypt(teamConfig.BUILDKITE_TOKEN)
+      };
+      
+      // Resolve sprint identifier to stable sprint index
+      const jiraService = new JiraService(decryptedTeamConfig);
+      const type = identifierType as 'index' | 'name';
+      const sprintIndex = await jiraService.resolveSprintIdentifier(sprintIdentifier as string | number, type);
+      
+      // Get sprint metadata to determine if it's active
+      const sprintMetadata = await jiraService.getSprintMetadata(sprintIndex);
+      const isActive = sprintMetadata.state === 'active';
+      
+      // Check cache - return data if available, otherwise return processing status
+      const cachedData = await getCachedSprintData(decryptedTeamConfig, sprintIndex, isActive);
+      if (cachedData) {
+        console.log(`Wait endpoint: Data ready for sprint index ${sprintIndex}`);
+        res.json(cachedData);
+      } else {
+        console.log(`Wait endpoint: Still processing sprint index ${sprintIndex}`);
+        res.json({
+          status: 'processing',
+          sprint: sprintMetadata
+        });
+      }
+    } catch (error) {
+      console.error('Error in wait endpoint:', error);
+      res.status(500).json({ error: 'Failed to check sprint data status' });
+    }
+  }
+
 }

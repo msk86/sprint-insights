@@ -140,49 +140,10 @@ function formatIssues(sprintData: any, includeTimeSpent: boolean = false): strin
   }).join('\n\n');
 }
 
-// Helper function to format historical context
-function formatHistoricalContext(historicalStats: any[] | undefined): string {
-  if (!historicalStats || historicalStats.length === 0) {
-    return 'No historical data available';
-  }
-  
-  return historicalStats.map((hist: any) => {
-    const completionRate = hist.totalIssues > 0 
-      ? ((hist.completedIssues / hist.totalIssues) * 100).toFixed(1) 
-      : '0';
-    const buildSuccessRate = hist.totalBuilds > 0 
-      ? ((hist.successfulBuilds / hist.totalBuilds) * 100).toFixed(1) 
-      : '0';
-    const releaseSuccessRate = hist.totalReleases > 0 
-      ? ((hist.successfulReleases / hist.totalReleases) * 100).toFixed(1) 
-      : '0';
-    
-    let sprintSummary = `Sprint ${hist.sprintIndex} (${hist.sprintName}):
-  - Issues: ${hist.totalIssues} (${hist.totalPoints} points) → ${hist.completedIssues} completed (${hist.completedPoints} points) = ${completionRate}% completion
-  - Builds: ${hist.totalBuilds} (${hist.successfulBuilds} successful = ${buildSuccessRate}%)
-  - Releases: ${hist.totalReleases} (${hist.successfulReleases} successful = ${releaseSuccessRate}%)
-  - DORA: DF=${hist.deploymentFrequency.toFixed(2)} releases/day, LT=${hist.medianLeadTime.toFixed(1)} days, CFR=${hist.changeFailureRate.toFixed(1)}%, MTTR=${hist.medianMTTR.toFixed(1)} hours`;
-    
-    // Add build summary by pipeline if available
-    if (hist.buildSummaryByPipeline && hist.buildSummaryByPipeline.length > 0) {
-      sprintSummary += '\n  Build/Release by Pipeline:';
-      hist.buildSummaryByPipeline.forEach((pipeline: any) => {
-        const pipelineBuildSuccessRate = pipeline.totalBuilds > 0 
-          ? ((pipeline.successfulBuilds / pipeline.totalBuilds) * 100).toFixed(1) 
-          : '0';
-        const pipelineReleaseSuccessRate = pipeline.totalReleases > 0 
-          ? ((pipeline.successfulReleases / pipeline.totalReleases) * 100).toFixed(1) 
-          : '0';
-        sprintSummary += `\n    - ${pipeline.pipelineName} (${pipeline.repository}): ${pipeline.totalBuilds} builds (${pipelineBuildSuccessRate}% success), ${pipeline.totalReleases} releases (${pipelineReleaseSuccessRate}% success), ${pipeline.avgBuildDuration.toFixed(1)} min avg`;
-      });
-    }
-    
-    return sprintSummary;
-  }).join('\n\n');
-}
+// Historical context removed - analysis now focuses only on current sprint
 
-// Helper function to build complete sprint context
-function buildSprintContext(sprintData: any, stats: any, historicalStats: any[] | undefined, includeTimeSpent: boolean = false): string {
+// Helper function to build complete sprint context (current sprint only)
+function buildSprintContext(sprintData: any, stats: any, includeTimeSpent: boolean = false): string {
   const totalIssues = stats?.totalIssues ?? sprintData.issues.length;
   
   return `${formatSprintMetadata(sprintData, stats)}
@@ -197,10 +158,6 @@ ${formatBoardColumns(sprintData)}
 
 <section name="ISSUES" count="${totalIssues}">
 ${formatIssues(sprintData, includeTimeSpent)}
-</section>
-
-<section name="HISTORICAL TRENDS">
-${formatHistoricalContext(historicalStats)}
 </section>`;
 }
 
@@ -214,7 +171,7 @@ export function buildSprintDataSystemMessage(
   historicalStats: any[] | undefined,
   includeTimeSpent: boolean = false
 ): string {
-  const sprintContext = buildSprintContext(sprintData, stats, historicalStats, includeTimeSpent);
+  const sprintContext = buildSprintContext(sprintData, stats, includeTimeSpent);
   
   return `<section name="SPRINT DATA FOR REFERENCE">
 ${sprintContext}
@@ -236,7 +193,7 @@ export function buildVisualizationSystemMessage(
   stats: any, 
   historicalStats: any[] | undefined
 ): string {
-  const sprintContext = buildSprintContext(sprintData, stats, historicalStats, false);
+  const sprintContext = buildSprintContext(sprintData, stats, false);
   
   return `<section name="SPRINT DATA FOR REFERENCE">
 ${sprintContext}
@@ -278,7 +235,7 @@ interface SprintData {
 const allSprints: SprintData[];  // Array of all sprints (current sprint is LAST)
 
 // Access patterns:
-const currentSprint = allSprints[0];  // Current sprint (MOST COMMON)
+const currentSprint = allSprints[allSprints.length - 1];  // Current sprint (MOST COMMON)
 const recent2Sprints = allSprints.slice(-2);  // Recent 2 sprints (including current sprint)
 const historicalSprints = allSprints.slice(0, -1);  // All previous sprints (excluding current sprint)
 const currentIssues = currentSprint.issues;  // Issues in current sprint
@@ -315,16 +272,16 @@ Chart Response Structure:
 Chart Examples:
 
 1. Sub-category distribution (PIE) - Current sprint (MOST COMMON):
-dataTransform: "const currentSprint = allSprints[0]; const categories = {}; currentSprint.issues.forEach(i => { const cat = i.subCategory || 'Uncategorized'; categories[cat] = (categories[cat] || 0) + 1; }); return Object.entries(categories).map(([name, value]) => ({ name, value }));"
+dataTransform: "const currentSprint = allSprints[allSprints.length - 1]; const categories = {}; currentSprint.issues.forEach(i => { const cat = i.subCategory || 'Uncategorized'; categories[cat] = (categories[cat] || 0) + 1; }); return Object.entries(categories).map(([name, value]) => ({ name, value }));"
 
 2. Completion trend across all sprints (LINE):
 dataTransform: "return allSprints.map(s => ({ name: s.sprint.name, completed: s.issues.filter(i => i.flags?.isCompleted).length }));"
 
 3. Story points by category (BAR) - Current sprint:
-dataTransform: "const currentSprint = allSprints[0]; const categories = {}; currentSprint.issues.forEach(i => { const cat = i.subCategory || 'Uncategorized'; categories[cat] = (categories[cat] || 0) + i.storyPoints; }); return Object.entries(categories).map(([name, points]) => ({ name, points }));"
+dataTransform: "const currentSprint = allSprints[allSprints.length - 1]; const categories = {}; currentSprint.issues.forEach(i => { const cat = i.subCategory || 'Uncategorized'; categories[cat] = (categories[cat] || 0) + i.storyPoints; }); return Object.entries(categories).map(([name, points]) => ({ name, points }));"
 
 4. Issue flags distribution (PIE) - Specific sprint by name:
-dataTransform: "const sprint = allSprints.find(s => s.sprint.name.includes('PX 19')) || allSprints[0]; const flags = { Blocked: 0, Incident: 0, Spillover: 0, Completed: 0 }; sprint.issues.forEach(i => { if (i.flags?.isBlocked) flags.Blocked++; if (i.flags?.isIncidentResponse) flags.Incident++; if (i.flags?.isSpillover) flags.Spillover++; if (i.flags?.isCompleted) flags.Completed++; }); return Object.entries(flags).map(([name, value]) => ({ name, value }));"
+dataTransform: "const sprint = allSprints.find(s => s.sprint.name.includes('PX 19')) || allSprints[allSprints.length - 1]; const flags = { Blocked: 0, Incident: 0, Spillover: 0, Completed: 0 }; sprint.issues.forEach(i => { if (i.flags?.isBlocked) flags.Blocked++; if (i.flags?.isIncidentResponse) flags.Incident++; if (i.flags?.isSpillover) flags.Spillover++; if (i.flags?.isCompleted) flags.Completed++; }); return Object.entries(flags).map(([name, value]) => ({ name, value }));"
 
 5. Build success rate trend (LINE) - All sprints:
 dataTransform: "return allSprints.map(s => { const builds = s.builds.filter(b => b.inSprint); const total = builds.length; const passed = builds.filter(b => b.status === 'passed').length; return { name: s.sprint.name, successRate: total > 0 ? (passed / total * 100) : 0 }; });"
@@ -333,7 +290,7 @@ dataTransform: "return allSprints.map(s => { const builds = s.builds.filter(b =>
 dataTransform: "const targetSprints = allSprints.filter(s => s.sprint.name.match(/PX (19|20|21)/)); return targetSprints.map(s => ({ name: s.sprint.name, completed: s.issues.filter(i => i.flags?.isCompleted).length, total: s.issues.length }));"
 
 7. Average time spent by column (BAR) - Current sprint using timeSpent:
-dataTransform: "const currentSprint = allSprints[0]; const columnTimes = {}; currentSprint.issues.forEach(i => { Object.entries(i.timeSpent || {}).forEach(([col, time]) => { if (!columnTimes[col]) columnTimes[col] = []; columnTimes[col].push(time); }); }); return Object.entries(columnTimes).map(([col, times]) => ({ name: col, avgTime: times.reduce((a, b) => a + b, 0) / times.length }));"
+dataTransform: "const currentSprint = allSprints[allSprints.length - 1]; const columnTimes = {}; currentSprint.issues.forEach(i => { Object.entries(i.timeSpent || {}).forEach(([col, time]) => { if (!columnTimes[col]) columnTimes[col] = []; columnTimes[col].push(time); }); }); return Object.entries(columnTimes).map(([col, times]) => ({ name: col, avgTime: times.reduce((a, b) => a + b, 0) / times.length }));"
 
 8. Cross-sprint blocked issues trend (LINE) - Filter issues across sprints:
 dataTransform: "return allSprints.map(s => ({ name: s.sprint.name, blockedIssues: s.issues.filter(i => i.flags?.isBlocked).length, totalIssues: s.issues.length }));"
@@ -362,7 +319,7 @@ Table structure:
 Table Examples:
 
 1. Top 10 issues by cycle time (TABLE):
-dataTransform: "const currentSprint = allSprints[0]; const issuesWithCycleTime = currentSprint.issues.filter(i => i.workStartedAt && i.completedAt).map(i => ({ key: i.key, summary: i.summary, cycleTime: Math.round((new Date(i.completedAt).getTime() - new Date(i.workStartedAt).getTime()) / (1000 * 60 * 60 * 24) * 10) / 10 })).sort((a, b) => b.cycleTime - a.cycleTime).slice(0, 10); return issuesWithCycleTime;"
+dataTransform: "const currentSprint = allSprints[allSprints.length - 1]; const issuesWithCycleTime = currentSprint.issues.filter(i => i.workStartedAt && i.completedAt).map(i => ({ key: i.key, summary: i.summary, cycleTime: Math.round((new Date(i.completedAt).getTime() - new Date(i.workStartedAt).getTime()) / (1000 * 60 * 60 * 24) * 10) / 10 })).sort((a, b) => b.cycleTime - a.cycleTime).slice(0, 10); return issuesWithCycleTime;"
 columns: [{ field: "key", headerName: "Issue", width: 120 }, { field: "summary", headerName: "Summary", width: 300 }, { field: "cycleTime", headerName: "Cycle Time (days)", width: 150, type: "number" }]
 
 2. Blocked issues across all sprints (TABLE):
@@ -370,7 +327,7 @@ dataTransform: "const blocked = allSprints.map(s => s.issues.filter(i => i.flags
 columns: [{ field: "sprint", headerName: "Sprint", width: 120 }, { field: "key", headerName: "Issue", width: 120 }, { field: "summary", headerName: "Summary", width: 250 }, { field: "category", headerName: "Category", width: 150 }]
 
 3. Issues with most time in specific column (TABLE):
-dataTransform: "const currentSprint = allSprints[0]; const issues = currentSprint.issues.map(i => ({ key: i.key, summary: i.summary, ...i.timeSpent })).sort((a, b) => (b['In Progress'] || 0) - (a['In Progress'] || 0)).slice(0, 10); return issues;"
+dataTransform: "const currentSprint = allSprints[allSprints.length - 1]; const issues = currentSprint.issues.map(i => ({ key: i.key, summary: i.summary, ...i.timeSpent })).sort((a, b) => (b['In Progress'] || 0) - (a['In Progress'] || 0)).slice(0, 10); return issues;"
 columns: [{ field: "key", headerName: "Issue", width: 120 }, { field: "summary", headerName: "Summary", width: 250 }, { field: "In Progress", headerName: "Time In Progress (days)", width: 180, type: "number" }]
 
 </section>
@@ -403,7 +360,7 @@ For table requests:
 <section name="CRITICAL RULES">
 
 1. Write JavaScript code that operates on "allSprints" variable (available at runtime)
-2. Default to current sprint: allSprints[0]
+2. Default to current sprint: allSprints[allSprints.length - 1]
 3. Filter by sprint name/index ONLY if user explicitly mentions it (e.g., "PX 19", "sprint 19")
 4. Use allSprints.find() or .filter() to find specific sprints
 5. DO NOT check for data availability - app handles this automatically
@@ -420,15 +377,14 @@ For table requests:
 }
 
 /**
- * Build system message for sprint analysis (sprint data only).
+ * Build system message for sprint analysis (current sprint data only).
  * This is the same as buildSprintDataSystemMessage but kept separate for clarity.
  */
 export function buildSprintAnalysisSystemMessage(
   sprintData: any, 
-  stats: any, 
-  historicalStats: any[] | undefined
+  stats: any
 ): string {
-  return buildSprintDataSystemMessage(sprintData, stats, historicalStats, false);
+  return buildSprintDataSystemMessage(sprintData, stats, undefined, false);
 }
 
 /**
@@ -444,7 +400,7 @@ You are an expert agile coach and sprint analyst. Analyze the sprint data provid
 2. Quality indicators (back-and-forth issues, incidents)
 3. Issue flow patterns and bottlenecks (status changes, time in columns)
 4. Work distribution (story points, sub-categories)
-5. Trends compared to historical data
+5. Build and release performance (DORA metrics)
 6. Actionable recommendations for improvement
 </section>
 
@@ -484,7 +440,7 @@ You are an expert agile coach. Generate a chart or table configuration to visual
 
 → Sprint data is in the SYSTEM PROMPT for reference
 → Interface specifications (data structure, examples, rules) are in the SYSTEM PROMPT
-→ DEFAULT: When user doesn't specify a sprint, use CURRENT SPRINT (allSprints[0])
+→ DEFAULT: When user doesn't specify a sprint, use CURRENT SPRINT (allSprints[allSprints.length - 1])
 → DEFAULT: When user specify a issue, get issue across multiple sprints (allSprints.map(s => s.issues.find(i => i.key.toLowerCase() === 'PX-123'.toLowerCase())))
 → Return ONLY the JSON configuration, NO analysis text needed
 </section>`;
@@ -500,19 +456,16 @@ ${userMessage}
 </section>
 
 <section name="CONTEXT">
-→ Sprint data is in the SYSTEM PROMPT (current sprint + historical sprints)
+→ Current sprint data is in the SYSTEM PROMPT
 → Previous chart/table configurations (if any) are in the CHAT HISTORY
 → You can reference previous visualizations when answering questions
-→ DEFAULT: When user doesn't specify a sprint, use the CURRENT SPRINT as context
 </section>
 
 <section name="YOUR TASK">
 You are an expert agile coach with deep knowledge of sprint metrics and team dynamics.
 
 Answer the user's question about the sprint data provided in the SYSTEM PROMPT.
-- If user asks about "this sprint" or doesn't specify: use the CURRENT SPRINT
-- If user mentions a specific sprint name/number: use that sprint
-- If user asks about trends or comparisons: compare current sprint to historical data
+- Use only the current sprint data provided
 - If user asks about a previously generated chart/table: reference the configuration from chat history
 </section>
 
@@ -524,13 +477,11 @@ Return a JSON object with:
 </section>
 
 <section name="CRITICAL GUIDELINES">
-1. Answer concisely and directly based ONLY on the data provided in the SYSTEM PROMPT
+1. Answer concisely and directly based ONLY on the current sprint data provided in the SYSTEM PROMPT
 2. Use specific numbers and metrics when relevant
-3. Provide context from historical data when applicable
-4. If asked about trends, compare current sprint to historical data
-5. Use plain text only (no markdown formatting)
-6. NEVER fabricate or make up data (dates, numbers, names, etc.)
-7. If specific information is not available in the SYSTEM PROMPT, explicitly state that you don't have that information
-8. When referencing previous charts/tables, refer to the configuration in the chat history
+3. Use plain text only (no markdown formatting)
+4. NEVER fabricate or make up data (dates, numbers, names, etc.)
+5. If specific information is not available in the SYSTEM PROMPT, explicitly state that you don't have that information
+6. When referencing previous charts/tables, refer to the configuration in the chat history
 </section>`;
 }

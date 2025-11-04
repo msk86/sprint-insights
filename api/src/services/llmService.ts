@@ -25,10 +25,10 @@ export class LLMService {
   }
 
   async analyzeSprint(request: LLMAnalysisRequest): Promise<LLMAnalysisResponse> {
-    const { sprintData, stats, historicalStats } = request;
+    const { sprintData, stats } = request;
     
-    // Build system message with sprint data
-    const systemMessage = buildSprintAnalysisSystemMessage(sprintData, stats, historicalStats);
+    // Build system message with sprint data (no historical data)
+    const systemMessage = buildSprintAnalysisSystemMessage(sprintData, stats);
     
     // Build analysis prompt (just the task - data is in system message)
     const prompt = buildSprintAnalysisPrompt();

@@ -52,7 +52,7 @@ const DynamicChart: React.FC<DynamicChartProps> = ({ chartConfig, sprintData, hi
       // Create allSprints array (current sprint is LAST)
       const enrichedHistorical = historicalData?.map(enrichSprint) || [];
       const enrichedCurrent = enrichSprint(sprintData);
-      const allSprints = [...enrichedHistorical, enrichedCurrent];
+      const allSprints = [...enrichedHistorical.reverse(), enrichedCurrent];
 
       // Execute the data transformation function
       // Only allSprints is available to match LLM prompt

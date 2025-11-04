@@ -7,10 +7,8 @@ export class LLMController {
     try {
       const request: LLMAnalysisRequest = {
         sprintData: req.body.sprintData,
-        historicalData: req.body.historicalData,
         analysisType: 'sprint_analysis',
-        stats: req.body.stats,
-        historicalStats: req.body.historicalStats
+        stats: req.body.stats
       };
 
       const llmService = new LLMService();

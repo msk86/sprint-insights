@@ -124,20 +124,20 @@ API_VERSION=$(get_tfvar "api_version" "v1")
 
 cd "$ROOT_DIR"
 
-# $AWS_CMD lambda update-function-configuration \
-#     --function-name $LAMBDA_FUNCTION_NAME \
-#     --environment "Variables={
-#         NODE_ENV=production,
-#         BEDROCK_REGION=$BEDROCK_REGION,
-#         BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID,
-#         S3_BUCKET_NAME=$S3_BUCKET_NAME,
-#         ENCRYPTION_KEY=$ENCRYPTION_KEY,
-#         FRONTEND_URL=$WEBSITE_URL,
-#         JIRA_BASE_URL=$JIRA_BASE_URL,
-#         BUILDKITE_ORG_SLUG=$BUILDKITE_ORG_SLUG,
-#         API_VERSION=$API_VERSION
-#     }" \
-#     --region $REGION > /dev/null
+$AWS_CMD lambda update-function-configuration \
+    --function-name $LAMBDA_FUNCTION_NAME \
+    --environment "Variables={
+        NODE_ENV=production,
+        BEDROCK_REGION=$BEDROCK_REGION,
+        BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID,
+        S3_BUCKET_NAME=$S3_BUCKET_NAME,
+        ENCRYPTION_KEY=$ENCRYPTION_KEY,
+        FRONTEND_URL=$WEBSITE_URL,
+        JIRA_BASE_URL=$JIRA_BASE_URL,
+        BUILDKITE_ORG_SLUG=$BUILDKITE_ORG_SLUG,
+        API_VERSION=$API_VERSION
+    }" \
+    --region $REGION > /dev/null
 
 echo ""
 

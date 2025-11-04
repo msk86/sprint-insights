@@ -34,7 +34,7 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, hi
       // Create allSprints array (current sprint is first)
       const enrichedHistorical = historicalData?.map(enrichSprint) || [];
       const enrichedCurrent = enrichSprint(sprintData);
-      const allSprints = [enrichedCurrent, ...enrichedHistorical];
+      const allSprints = [...enrichedHistorical.reverse(), enrichedCurrent];
 
       // Execute the data transformation function
       // eslint-disable-next-line no-new-func

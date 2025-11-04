@@ -37,6 +37,9 @@ export const teamApi = {
   }
 };
 
+// Helper to wait for a specified time
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Sprint data API
 export const sprintApi = {
   getSprintData: async (
@@ -44,15 +47,71 @@ export const sprintApi = {
     sprintIdentifier: string | number, 
     identifierType: 'index' | 'name'
   ): Promise<SprintData> => {
-    const response = await api.get('/sprints', {
-      params: { 
-        team, 
-        sprintIdentifier,
-        identifierType
-      },
-      timeout: 60000 // 60 seconds for sprint data fetching
-    });
-    return response.data;
+    try {
+      // First, try the main endpoint with a timeout
+      const response = await api.get('/sprints', {
+        params: { 
+          team, 
+          sprintIdentifier,
+          identifierType
+        },
+        timeout: 110000 // 110 seconds (slightly longer than Lambda timeout of 120s)
+      });
+      
+      return response.data;
+    } catch (error: any) {
+      // Check if this is a 504 Gateway Timeout error
+      const isTimeout = error.response?.status === 504 || 
+                       error.code === 'ERR_NETWORK' || 
+                       error.message?.includes('timeout') ||
+                       error.message?.includes('Network');
+      
+      if (!isTimeout) {
+        // Not a timeout error, rethrow
+        throw error;
+      }
+      
+      console.log('Main request timed out (504 or timeout), falling back to polling...');
+      
+      // Poll /sprints/wait endpoint every 10 seconds until data is ready
+      const maxAttempts = 10; // 100 seconds max (10 * 10 seconds)
+      let attempt = 0;
+      
+      while (attempt < maxAttempts) {
+        attempt++;
+        
+        // Wait 10 seconds before polling
+        await sleep(10000);
+        
+        console.log(`Polling attempt ${attempt}/${maxAttempts}...`);
+        
+        try {
+          const pollResponse = await api.get('/sprints/wait', {
+            params: { 
+              team, 
+              sprintIdentifier,
+              identifierType
+            }
+          });
+          
+          const pollData = pollResponse.data;
+          
+          // Check if data is ready
+          if (!pollData.status || pollData.status !== 'processing') {
+            console.log(`Sprint data ready after ${attempt} polling attempts (${attempt * 10}s)`);
+            return pollData;
+          }
+          
+          console.log('Data still processing, will retry...');
+        } catch (pollError) {
+          console.warn(`Polling attempt ${attempt} failed:`, pollError);
+          // Continue polling even if one request fails
+        }
+      }
+      
+      // If we reach here, we've exceeded max attempts
+      throw new Error(`Timeout waiting for sprint data after ${maxAttempts * 10} seconds. The data may still be processing.`);
+    }
   }
 };
 
@@ -60,15 +119,11 @@ export const sprintApi = {
 export const llmApi = {
   analyzeSprint: async (
     sprintData: SprintData, 
-    historicalData?: SprintData[], 
-    stats?: any,
-    historicalStats?: any[]
+    stats?: any
   ): Promise<LLMAnalysisResponse> => {
     const response = await api.post('/llm/analyze', {
       sprintData,
-      historicalData,
-      stats,
-      historicalStats
+      stats
     });
     return response.data;
   },
