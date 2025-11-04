@@ -99,7 +99,7 @@ export class JiraService {
     const recentData = await this.makeJiraApiRequest(
       `${this.baseUrl}/rest/agile/1.0/board/${this.teamConfig.JIRA_BOARD_ID}/sprint?${recentParams}`
     );
-    
+
     let targetSprint;
     if (sprint === 'LATEST_CLOSED') {
       targetSprint = recentData.values.findLast((v: any) => v.state === 'closed');
@@ -112,7 +112,7 @@ export class JiraService {
     }
     
     const index = recentData.values.findIndex((v: any) => v.name === targetSprint.name);
-    const sprintIndex = total - 10 + index;
+    const sprintIndex = total - 12 + index;
     
     console.log(`Sprint Index for Project: ${this.teamConfig.JIRA_PROJECT}, Board: ${this.teamConfig.JIRA_BOARD_ID}, Sprint: ${targetSprint.name} is: ${sprintIndex}`);
     return { current: sprintIndex, total: total };
