@@ -195,10 +195,13 @@ const SprintsPage: React.FC = () => {
   };
 
   const handleSearch = async () => {
-    if (!selectedTeam || !sprintIdentifier) {
-      setError('Please select a team and enter a sprint identifier');
+    if (!selectedTeam) {
+      setError('Please select a team');
       return;
     }
+
+    // Use 'LATEST_CLOSED' as default if sprint identifier is empty
+    const identifier = sprintIdentifier.trim() || 'LATEST_CLOSED';
 
     try {
       setLoading(true);
@@ -207,7 +210,7 @@ const SprintsPage: React.FC = () => {
 
       // Get current sprint data (use 'name' since user enters sprint name)
       // This will automatically handle polling if data is not cached
-      const currentSprint = await sprintApi.getSprintData(selectedTeam, sprintIdentifier, 'name');
+      const currentSprint = await sprintApi.getSprintData(selectedTeam, identifier, 'name');
       
       // Apply issue flags to the sprint data
       const currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint);
@@ -403,7 +406,7 @@ const SprintsPage: React.FC = () => {
                 label="Sprint Identifier"
                 value={sprintIdentifier}
                 onChange={(e) => setSprintIdentifier(e.target.value)}
-                placeholder="Sprint name or number"
+                placeholder="Sprint name/number (default: latest closed)"
               />
             </Grid>
             <Grid item xs={12} sm={3}>
