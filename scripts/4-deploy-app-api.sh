@@ -80,18 +80,18 @@ echo "  ➜ Creating Lambda deployment package..."
 "$ROOT_DIR/scripts/package-lambda.sh"
 
 echo "  ➜ Updating Lambda function code..."
-# $AWS_CMD lambda update-function-code \
-#     --function-name $LAMBDA_FUNCTION_NAME \
-#     --zip-file fileb://lambda-deployment.zip \
-#     --region $REGION \
-#     --publish > /dev/null
+$AWS_CMD lambda update-function-code \
+    --function-name $LAMBDA_FUNCTION_NAME \
+    --zip-file fileb://lambda-deployment.zip \
+    --region $REGION \
+    --publish > /dev/null
 
-# if [ $? -eq 0 ]; then
-#     echo -e "${GREEN}✅ Lambda code updated!${NC}"
-# else
-#     echo -e "${RED}❌ Failed to update Lambda${NC}"
-#     exit 1
-# fi
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Lambda code updated!${NC}"
+else
+    echo -e "${RED}❌ Failed to update Lambda${NC}"
+    exit 1
+fi
 
 # Update env vars
 echo "  ➜ Updating Lambda environment variables..."
