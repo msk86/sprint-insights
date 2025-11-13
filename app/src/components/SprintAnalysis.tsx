@@ -87,6 +87,9 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
     ? calculateDailyCumulativePoints(sprintData)
     : calculateDailyCumulativeIssues(sprintData);
   
+  // Check if build data exists
+  const hasBuilds = sprintData.builds && sprintData.builds.length > 0;
+  
   // Generate colors for each column
   const columnColors = [
     '#8884d8', '#82ca9d', '#ffc658', '#ff8042', 
@@ -95,9 +98,9 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
 
   // Define all cards configuration
   const cards: CardConfig[] = [
-    // DORA Metrics
-    {
-      type: 'metrics-grid',
+    // DORA Metrics - only show if we have build data
+    ...(hasBuilds ? [{
+      type: 'metrics-grid' as CardType,
       title: 'DORA Metrics',
       metrics: [
         {
@@ -129,10 +132,10 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
           xs: 6
         }
       ]
-    },
-    // Release Statistics
-    {
-      type: 'metrics-grid',
+    }] : []),
+    // Release Statistics - only show if we have build data
+    ...(hasBuilds ? [{
+      type: 'metrics-grid' as CardType,
       title: 'Release Statistics',
       metrics: [
         {
@@ -174,7 +177,7 @@ const SprintAnalysis: React.FC<SprintAnalysisProps> = ({
           xs: 6
         }
       ]
-    },
+    }] : []),
     // Sprint Statistics
     {
       type: 'metrics-grid',

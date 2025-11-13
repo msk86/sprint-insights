@@ -31,6 +31,9 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
   // Check if any sprint in the series is using story points
   const allSprints = [currentSprint, ...historicalSprints];
   const usingStoryPoints = allSprints.some(sprint => isUsingStoryPoints(sprint));
+  
+  // Check if any sprint has build data
+  const hasBuilds = allSprints.some(sprint => sprint.builds && sprint.builds.length > 0);
 
   const extractSprintIndex = (sprintName: string, sprintIndex: number): string => {
     // Extract sprint index using regex pattern
@@ -108,54 +111,57 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
 
   // Define all chart cards
   const chartCards = [
-    {
-      title: 'DORA: Lead Time for Changes',
-      yAxisLabel: 'Days',
-      lines: [
-        {
-          dataKey: 'leadTime',
-          stroke: '#8884d8',
-          name: 'Lead Time (days)',
-          formatter: (value: number) => `${value.toFixed(1)} days`
-        }
-      ]
-    },
-    {
-      title: 'DORA: Deployment Frequency',
-      yAxisLabel: 'Per Day',
-      lines: [
-        {
-          dataKey: 'deploymentFrequency',
-          stroke: '#4caf50',
-          name: 'Deployments/day',
-          formatter: (value: number) => `${value.toFixed(2)} per day`
-        }
-      ]
-    },
-    {
-      title: 'DORA: Change Failure Rate',
-      yAxisLabel: '%',
-      lines: [
-        {
-          dataKey: 'changeFailureRate',
-          stroke: '#ff6b6b',
-          name: 'Failure Rate (%)',
-          formatter: (value: number) => `${value.toFixed(1)}%`
-        }
-      ]
-    },
-    {
-      title: 'DORA: Mean Time to Restore',
-      yAxisLabel: 'Hours',
-      lines: [
-        {
-          dataKey: 'mttr',
-          stroke: '#ff9800',
-          name: 'MTTR (hours)',
-          formatter: (value: number) => `${value.toFixed(1)} hours`
-        }
-      ]
-    },
+    // DORA charts - only show if we have build data
+    ...(hasBuilds ? [
+      {
+        title: 'DORA: Lead Time for Changes',
+        yAxisLabel: 'Days',
+        lines: [
+          {
+            dataKey: 'leadTime',
+            stroke: '#8884d8',
+            name: 'Lead Time (days)',
+            formatter: (value: number) => `${value.toFixed(1)} days`
+          }
+        ]
+      },
+      {
+        title: 'DORA: Deployment Frequency',
+        yAxisLabel: 'Per Day',
+        lines: [
+          {
+            dataKey: 'deploymentFrequency',
+            stroke: '#4caf50',
+            name: 'Deployments/day',
+            formatter: (value: number) => `${value.toFixed(2)} per day`
+          }
+        ]
+      },
+      {
+        title: 'DORA: Change Failure Rate',
+        yAxisLabel: '%',
+        lines: [
+          {
+            dataKey: 'changeFailureRate',
+            stroke: '#ff6b6b',
+            name: 'Failure Rate (%)',
+            formatter: (value: number) => `${value.toFixed(1)}%`
+          }
+        ]
+      },
+      {
+        title: 'DORA: Mean Time to Restore',
+        yAxisLabel: 'Hours',
+        lines: [
+          {
+            dataKey: 'mttr',
+            stroke: '#ff9800',
+            name: 'MTTR (hours)',
+            formatter: (value: number) => `${value.toFixed(1)} hours`
+          }
+        ]
+      }
+    ] : []),
     {
       title: usingStoryPoints ? 'Completed Story Points & Issues' : 'Completed Issues',
       yAxisLabel: '',
@@ -222,7 +228,8 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
         }
       ]
     },
-    {
+    // Release Metrics - only show if we have build data
+    ...(hasBuilds ? [{
       title: 'Release Metrics',
       yAxisLabel: '',
       lines: [
@@ -239,7 +246,7 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
           formatter: (value: number) => `${value} releases`
         }
       ]
-    }
+    }] : [])
   ];
 
   const renderChartCard = (card: typeof chartCards[0]) => (
