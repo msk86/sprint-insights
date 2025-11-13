@@ -20,17 +20,17 @@ output "app_bucket_name" {
 
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID for the app"
-  value       = aws_cloudfront_distribution.sprint_insights_app.id
+  value       = var.use_localstack ? "N/A - skipped on LocalStack" : aws_cloudfront_distribution.sprint_insights_app[0].id
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFront domain name for accessing the app"
-  value       = aws_cloudfront_distribution.sprint_insights_app.domain_name
+  value       = var.use_localstack ? "N/A - skipped on LocalStack" : aws_cloudfront_distribution.sprint_insights_app[0].domain_name
 }
 
 output "website_url" {
   description = "Website URL (via CloudFront)"
-  value       = "https://${aws_cloudfront_distribution.sprint_insights_app.domain_name}"
+  value       = var.use_localstack ? "http://localhost:3000" : "https://${aws_cloudfront_distribution.sprint_insights_app[0].domain_name}"
 }
 
 output "ip_whitelist_enabled" {

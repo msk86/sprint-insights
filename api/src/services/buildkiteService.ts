@@ -3,7 +3,7 @@ import { TeamConfig, Build, Deployment } from '../types';
 export class BuildkiteService {
   private baseUrl = 'https://api.buildkite.com/v2';
   private orgSlug: string;
-  private deploymentRegex = /deploy/;
+  private deploymentRegex = /deploy|release/;
   private prodRegex = /prod|production/;
 
   constructor(private teamConfig: TeamConfig) {
@@ -19,12 +19,33 @@ export class BuildkiteService {
       return builds;
     }
     
-    const pipelines = this.teamConfig.BUILDKITE_PIPELINES.split(',').map(p => p.trim());
+    type PipelineCfg = { name: string; rawName: string; regex?: RegExp | null };
+    const parsePipelineToken = (token: string): PipelineCfg => {
+      const raw = token.trim();
+      // pattern: name:regex  (assume later part is the regex)
+      const parts = raw.split(':');
+      if (parts.length < 2) {
+        return { name: raw, rawName: raw, regex: null };
+      }
+      const namePart = parts[0];
+      const regexPart = parts[1];
+      let regex: RegExp | null = null;
+      try {
+        // Support either /regex/flags or bare regex string
+        const m = regexPart.match(/^\/(.+)\/([gimsuy]*)$/);
+        regex = m ? new RegExp(m[1], m[2]) : new RegExp(regexPart);
+      } catch {
+        regex = null;
+      }
+      return { name: namePart, rawName: raw, regex };
+    };
+    const pipelines = this.teamConfig.BUILDKITE_PIPELINES.split(',').map(p => parsePipelineToken(p));
     const pipelinesWithoutBuilds: string[] = [];
     
-    for (const pipelineName of pipelines) {
+    for (const pipelineCfg of pipelines) {
+      const pipelineName = pipelineCfg.name; // pure name for API and data
       try {
-        const pipelineBuilds = await this.fetchPipelineBuilds(pipelineName, startDate, endDate);
+        const pipelineBuilds = await this.fetchPipelineBuilds(pipelineName, startDate, endDate, pipelineCfg);
         if (pipelineBuilds.length > 0) {
           builds.push(...pipelineBuilds);
         } else {
@@ -50,7 +71,7 @@ export class BuildkiteService {
     return builds;
   }
 
-  private async fetchPipelineBuilds(pipelineName: string, startDate: Date, endDate: Date): Promise<Build[]> {
+  private async fetchPipelineBuilds(pipelineName: string, startDate: Date, endDate: Date, pipelineCfg: { name: string; regex?: RegExp | null }): Promise<Build[]> {
     const url = `${this.baseUrl}/organizations/${this.orgSlug}/pipelines/${pipelineName}/builds`;
     const params = new URLSearchParams({
       created_from: startDate.toISOString(),
@@ -72,7 +93,7 @@ export class BuildkiteService {
     }
 
     const buildsData = await response.json() as any[];
-    return buildsData.map((build: any) => this.transformBuild(build, pipelineName, true));
+    return buildsData.map((build: any) => this.transformBuild(build, pipelineCfg, true));
   }
 
   private async fetchLatestBuildBeforeDate(pipelineName: string, beforeDate: Date): Promise<Build | null> {
@@ -104,14 +125,15 @@ export class BuildkiteService {
       return null;
     }
 
-    return this.transformBuild(buildsData[0], pipelineName, false);
+    // No regex application for latest-before date; still transform with no sprint
+    return this.transformBuild(buildsData[0], { name: pipelineName, regex: null }, false);
   }
 
-  private transformBuild(buildData: any, pipelineName: string, inSprint: boolean): Build {
-    const deployments = this.extractProductionDeployments(buildData.jobs || []);
+  private transformBuild(buildData: any, pipelineCfg: { name: string; regex?: RegExp | null }, inSprint: boolean): Build {
+    const deployments = this.extractProductionDeployments(buildData, pipelineCfg);
     
     return {
-      pipelineName,
+      pipelineName: pipelineCfg.name, // ensure pure name is stored
       buildNumber: buildData.number,
       status: buildData.state,
       startedAt: buildData.started_at,
@@ -127,19 +149,30 @@ export class BuildkiteService {
     };
   }
 
-  private extractProductionDeployments(jobs: any[]): Deployment[] {
-    return jobs
-      .filter(job => 
-        job.type === 'script' && 
-        this.deploymentRegex.test(job.name?.toLowerCase()) && 
-        this.prodRegex.test(job.name?.toLowerCase())
-      )
-      .map(job => ({
+  private extractProductionDeployments(buildData: any, pipelineCfg: { regex?: RegExp | null }): Deployment[] {
+    // Resolve regex from pipeline config (applies to job.name only)
+    const releaseRegex: RegExp | null = pipelineCfg.regex || null;
+
+    // 1) Extract deployments from jobs using legacy prod/deploy heuristics,
+    // or include jobs whose names match provided regex
+    const jobs: any[] = buildData.jobs || [];
+    const jobDeployments: Deployment[] = jobs
+      .filter((job: any, idx: number) => {
+        const defaultMatch =
+          job.type === 'script' &&
+          this.deploymentRegex.test(job.name?.toLowerCase()) &&
+          this.prodRegex.test(job.name?.toLowerCase());
+        if (!releaseRegex) return defaultMatch;
+        return releaseRegex.test(job.name || '');
+      })
+      .map((job: any) => ({
         deployedAt: job.finished_at || job.started_at,
         name: job.name,
         status: job.state === 'passed' ? 'success' : job.state === 'failed' ? 'failed' : 'pending'
       }))
-      .filter(deployment => deployment.status !== 'pending');
+      .filter((deployment: Deployment) => deployment.status !== 'pending');
+
+    return jobDeployments;
   }
 
   private calculateDuration(startedAt: string, finishedAt: string): number {

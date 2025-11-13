@@ -71,6 +71,8 @@ export class TeamController {
         JIRA_PROJECT: teamData.JIRA_PROJECT,
         JIRA_BOARD_ID: teamData.JIRA_BOARD_ID,
         BUILDKITE_PIPELINES: teamData.BUILDKITE_PIPELINES,
+        INCIDENT_FIELD: teamData.INCIDENT_FIELD,
+        INCIDENT_REGEX: teamData.INCIDENT_REGEX,
         // Only encrypt tokens if they are not the placeholder value
         JIRA_TOKEN: teamData.JIRA_TOKEN === '***encrypted***' 
           ? existingTeam.JIRA_TOKEN 

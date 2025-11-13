@@ -99,7 +99,7 @@ resource "aws_lambda_function" "sprint_insights_api" {
       BEDROCK_REGION     = var.bedrock_region
       BEDROCK_MODEL_ID   = var.bedrock_model_id
       S3_BUCKET_NAME     = aws_s3_bucket.sprint_insights_data.bucket
-      FRONTEND_URL       = "https://${aws_cloudfront_distribution.sprint_insights_app.domain_name}"
+      FRONTEND_URL       = var.use_localstack ? "http://localhost:3000" : "https://${aws_cloudfront_distribution.sprint_insights_app[0].domain_name}"
       JIRA_BASE_URL      = var.jira_base_url
       BUILDKITE_ORG_SLUG = var.buildkite_org_slug
       ENCRYPTION_KEY     = var.encryption_key
@@ -345,13 +345,15 @@ resource "aws_s3_bucket_public_access_block" "sprint_insights_app" {
   restrict_public_buckets = true
 }
 
-# CloudFront Origin Access Identity
+# CloudFront Origin Access Identity (skip on LocalStack)
 resource "aws_cloudfront_origin_access_identity" "sprint_insights_app" {
+  count   = var.use_localstack ? 0 : 1
   comment = "Origin Access Identity for Sprint Insights App"
 }
 
-# S3 Bucket Policy for CloudFront
+# S3 Bucket Policy for CloudFront (skip on LocalStack)
 resource "aws_s3_bucket_policy" "sprint_insights_app" {
+  count  = var.use_localstack ? 0 : 1
   bucket = aws_s3_bucket.sprint_insights_app.id
 
   policy = jsonencode({
@@ -361,7 +363,7 @@ resource "aws_s3_bucket_policy" "sprint_insights_app" {
         Sid    = "AllowCloudFrontAccess"
         Effect = "Allow"
         Principal = {
-          AWS = aws_cloudfront_origin_access_identity.sprint_insights_app.iam_arn
+          AWS = aws_cloudfront_origin_access_identity.sprint_insights_app[0].iam_arn
         }
         Action   = "s3:GetObject"
         Resource = "${aws_s3_bucket.sprint_insights_app.arn}/*"
@@ -370,8 +372,9 @@ resource "aws_s3_bucket_policy" "sprint_insights_app" {
   })
 }
 
-# CloudFront Distribution for Static Website
+# CloudFront Distribution for Static Website (skip on LocalStack)
 resource "aws_cloudfront_distribution" "sprint_insights_app" {
+  count               = var.use_localstack ? 0 : 1
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
@@ -382,7 +385,7 @@ resource "aws_cloudfront_distribution" "sprint_insights_app" {
     origin_id   = "S3-${aws_s3_bucket.sprint_insights_app.id}"
 
     s3_origin_config {
-      origin_access_identity = aws_cloudfront_origin_access_identity.sprint_insights_app.cloudfront_access_identity_path
+      origin_access_identity = aws_cloudfront_origin_access_identity.sprint_insights_app[0].cloudfront_access_identity_path
     }
   }
 

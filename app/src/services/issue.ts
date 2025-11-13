@@ -21,7 +21,24 @@ export interface IssueFlags {
 /**
  * Determines if an issue is incident response based on sub-category
  */
-export function isIncidentResponse(issue: Issue, _: SprintData): boolean {
+export function isIncidentResponse(
+  issue: Issue,
+  _: SprintData,
+  options?: { incidentField?: 'summary' | 'subCategory'; incidentRegex?: string }
+): boolean {
+  // If config provided, use it
+  if (options?.incidentRegex) {
+    try {
+      const m = options.incidentRegex.match(/^\/(.+)\/([gimsuy]*)$/);
+      const rx = m ? new RegExp(m[1], m[2]) : new RegExp(options.incidentRegex);
+      const field = options.incidentField || 'subCategory';
+      const value = field === 'summary' ? (issue.summary || '') : (issue.subCategory || '');
+      return rx.test(value);
+    } catch {
+      // fall through to default heuristic
+    }
+  }
+  // Default heuristic
   return !!(issue.subCategory && issue.subCategory.toLowerCase().includes('incident'));
 }
 
@@ -152,10 +169,14 @@ function getHistoriesInSprint(issue: Issue, withBoundary: boolean = false) {
 /**
  * Calculate flags for an issue
  */
-export function calculateIssueFlags(issue: Issue, sprintData: SprintData): IssueFlags {
+export function calculateIssueFlags(
+  issue: Issue,
+  sprintData: SprintData,
+  options?: { incidentField?: 'summary' | 'subCategory'; incidentRegex?: string }
+): IssueFlags {
   return {
     isBlocked: isIssueBlocked(issue, sprintData),
-    isIncidentResponse: isIncidentResponse(issue, sprintData),
+    isIncidentResponse: isIncidentResponse(issue, sprintData, options),
     isBackAndForth: isIssueBackAndForth(issue, sprintData),
     isUnplanned: isIssueUnplanned(issue, sprintData),
     isInherited: isIssueInherited(issue, sprintData),
@@ -168,12 +189,15 @@ export function calculateIssueFlags(issue: Issue, sprintData: SprintData): Issue
 /**
  * Apply flags to all issues in sprint data
  */
-export function applyIssueFlagsToSprintData(sprintData: SprintData): SprintData {
+export function applyIssueFlagsToSprintData(
+  sprintData: SprintData,
+  options?: { incidentField?: 'summary' | 'subCategory'; incidentRegex?: string }
+): SprintData {
   return {
     ...sprintData,
     issues: sprintData.issues.map(issue => ({
       ...issue,
-      flags: calculateIssueFlags(issue, sprintData)
+      flags: calculateIssueFlags(issue, sprintData, options)
     }))
   };
 }

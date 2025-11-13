@@ -9,7 +9,7 @@ if ! curl -s http://localhost:4566/_localstack/health > /dev/null; then
     echo "LocalStack is not running. Starting LocalStack..."
     docker-compose up -d
     echo "Waiting for LocalStack to start..."
-    sleep 30
+    sleep 10
 fi
 
 # Verify LocalStack is running

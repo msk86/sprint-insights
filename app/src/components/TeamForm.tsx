@@ -4,7 +4,13 @@ import {
   TextField,
   Button,
   Grid,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Typography,
+  MenuItem,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TeamConfig } from '../types';
 
 interface TeamFormProps {
@@ -25,6 +31,8 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
     JIRA_BOARD_ID: '',
     BUILDKITE_TOKEN: '',
     BUILDKITE_PIPELINES: '',
+    INCIDENT_FIELD: '' as '' | 'summary' | 'subCategory',
+    INCIDENT_REGEX: '',
   });
 
   useEffect(() => {
@@ -37,6 +45,8 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
         JIRA_BOARD_ID: team.JIRA_BOARD_ID,
         BUILDKITE_TOKEN: team.BUILDKITE_TOKEN, // Keep the encrypted placeholder
         BUILDKITE_PIPELINES: team.BUILDKITE_PIPELINES,
+        INCIDENT_FIELD: (team.INCIDENT_FIELD as any) || '',
+        INCIDENT_REGEX: team.INCIDENT_REGEX || '',
       });
     }
   }, [team]);
@@ -54,6 +64,8 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
     // Prepare data for submission
     const submitData = {
       ...formData,
+      INCIDENT_FIELD: formData.INCIDENT_FIELD || undefined,
+      INCIDENT_REGEX: formData.INCIDENT_FIELD ? formData.INCIDENT_REGEX : '',
       // If token fields are empty (user cleared them), send empty string
       // If they contain '***encrypted***', keep that value for backend to handle
       JIRA_TOKEN: formData.JIRA_TOKEN === '' ? '' : formData.JIRA_TOKEN,
@@ -136,6 +148,41 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
             onChange={handleChange('BUILDKITE_PIPELINES')}
             placeholder="pipeline1,pipeline2,pipeline3"
           />
+        </Grid>
+
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography>Advanced settings (optional)</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={3}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Incident field"
+                    value={formData.INCIDENT_FIELD}
+                    onChange={handleChange('INCIDENT_FIELD')}
+                  >
+                    <MenuItem value="">(none)</MenuItem>
+                    <MenuItem value="summary">summary</MenuItem>
+                    <MenuItem value="subCategory">subCategory</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <TextField
+                    fullWidth
+                    label="Incident regex (/.../)"
+                    value={formData.INCIDENT_REGEX}
+                    onChange={handleChange('INCIDENT_REGEX')}
+                    placeholder="/incident|sev[1-2]/i"
+                    disabled={!formData.INCIDENT_FIELD}
+                  />
+                </Grid>
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
       </Grid>
 

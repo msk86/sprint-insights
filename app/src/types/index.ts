@@ -6,6 +6,9 @@ export interface TeamConfig {
   JIRA_BOARD_ID: string;
   BUILDKITE_TOKEN: string;
   BUILDKITE_PIPELINES: string;
+  // Optional advanced settings
+  INCIDENT_FIELD?: 'summary' | 'subCategory';
+  INCIDENT_REGEX?: string; // e.g. `/incident|sev[1-2]/i`
 }
 
 export interface SprintMeta {

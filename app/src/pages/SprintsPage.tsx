@@ -212,8 +212,12 @@ const SprintsPage: React.FC = () => {
       // This will automatically handle polling if data is not cached
       const currentSprint = await sprintApi.getSprintData(selectedTeam, identifier, 'name');
       
-      // Apply issue flags to the sprint data
-      const currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint);
+      // Apply issue flags to the sprint data (pass incident config from selected team)
+      const teamConfig = teams.find(t => t.team === selectedTeam);
+      const currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint, {
+        incidentField: teamConfig?.INCIDENT_FIELD,
+        incidentRegex: teamConfig?.INCIDENT_REGEX
+      });
       setSprintData(currentSprintWithFlags);
 
       // Calculate stats for current sprint (needed for AI analysis)
@@ -288,7 +292,10 @@ const SprintsPage: React.FC = () => {
           .then(results => {
             const historicalSprints = results
               .filter((s): s is SprintData => s !== null)
-              .map(sprint => applyIssueFlagsToSprintData(sprint));
+              .map(sprint => applyIssueFlagsToSprintData(sprint, {
+                incidentField: teamConfig?.INCIDENT_FIELD,
+                incidentRegex: teamConfig?.INCIDENT_REGEX
+              }));
 
             setHistoricalData(historicalSprints.length > 0 ? { currentSprint: currentSprintWithFlags, historicalSprints } : null);
 
@@ -416,7 +423,7 @@ const SprintsPage: React.FC = () => {
                   value={historyCount}
                   onChange={(_e, value) => setHistoryCount(value as number)}
                   min={0}
-                  max={12}
+                  max={25}
                   step={1}
                   marks
                   valueLabelDisplay="auto"
