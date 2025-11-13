@@ -77,7 +77,6 @@ const SprintsPage: React.FC = () => {
   const [historicalData, setHistoricalData] = useState<{ currentSprint: SprintData; historicalSprints: SprintData[] } | null>(null);
   const [historicalStats, setHistoricalStats] = useState<any[] | null>(null);
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysisResponse | null>(null);
-  const [lastAnalyzedKey, setLastAnalyzedKey] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [selectedFlags, setSelectedFlags] = useState<string[]>([]);
@@ -85,6 +84,14 @@ const SprintsPage: React.FC = () => {
   const [chatPanelHeight, setChatPanelHeight] = useState<number>(0);
   const chatPanelRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  
+  // Track previous search parameters to detect if only history count changed
+  const previousSearchRef = useRef<{
+    team: string;
+    sprintIdentifier: string;
+    currentSprintIndex: number;
+    historyCount: number;
+  } | null>(null);
 
   // Get unique sub-categories from sprint data
   const subCategories = useMemo(() => {
@@ -206,19 +213,39 @@ const SprintsPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      setLoadingMessage('Loading sprint data...');
-
-      // Get current sprint data (use 'name' since user enters sprint name)
-      // This will automatically handle polling if data is not cached
-      const currentSprint = await sprintApi.getSprintData(selectedTeam, identifier, 'name');
       
-      // Apply issue flags to the sprint data (pass incident config from selected team)
+      // Check if current sprint data has not changed (team and sprint identifier unchanged)
+      const isCurrentSprintNotChange = previousSearchRef.current &&
+        previousSearchRef.current.team === selectedTeam &&
+        previousSearchRef.current.sprintIdentifier === identifier &&
+        sprintData !== null &&
+        sprintData.sprint.index !== undefined;
+
+      // Get team config (needed for both current sprint and historical data)
       const teamConfig = teams.find(t => t.team === selectedTeam);
-      const currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint, {
-        incidentField: teamConfig?.INCIDENT_FIELD,
-        incidentRegex: teamConfig?.INCIDENT_REGEX
-      });
-      setSprintData(currentSprintWithFlags);
+
+      let currentSprint: SprintData;
+      let currentSprintWithFlags: SprintData;
+
+      if (isCurrentSprintNotChange) {
+        // Reuse existing sprint data
+        console.log('Team and sprint identifier unchanged, reusing current sprint data');
+        currentSprint = sprintData;
+        currentSprintWithFlags = sprintData;
+        setLoadingMessage('Updating historical data...');
+      } else {
+        // Load current sprint data (use 'name' since user enters sprint name)
+        // This will automatically handle polling if data is not cached
+        setLoadingMessage('Loading sprint data...');
+        currentSprint = await sprintApi.getSprintData(selectedTeam, identifier, 'name');
+        
+        // Apply issue flags to the sprint data (pass incident config from selected team)
+        currentSprintWithFlags = applyIssueFlagsToSprintData(currentSprint, {
+          incidentField: teamConfig?.INCIDENT_FIELD,
+          incidentRegex: teamConfig?.INCIDENT_REGEX
+        });
+        setSprintData(currentSprintWithFlags);
+      }
 
       // Calculate stats for current sprint (needed for AI analysis)
       const sprintStats = calculateSprintStats(currentSprintWithFlags);
@@ -251,14 +278,11 @@ const SprintsPage: React.FC = () => {
         buildSummaryByPipeline,
       };
 
-      // Create a unique key for the current team + sprint combination
-      const currentKey = `${selectedTeam}-${currentSprint.sprint.index}`;
-      
       // Start AI analysis in parallel with historical data
       const promises: Promise<void>[] = [];
       
-      // AI analysis promise
-      if (currentKey !== lastAnalyzedKey) {
+      // AI analysis promise - skip if current sprint hasn't changed
+      if (!isCurrentSprintNotChange) {
         // Prepare sprint data without builds for LLM (only current sprint, no historical data)
         const currentSprintForLLM = { ...currentSprintWithFlags, builds: [] };
 
@@ -266,7 +290,6 @@ const SprintsPage: React.FC = () => {
         const analysisPromise = llmApi.analyzeSprint(currentSprintForLLM, stats)
           .then(analysis => {
             setLlmAnalysis(analysis);
-            setLastAnalyzedKey(currentKey);
             console.log('AI analysis complete');
           })
           .catch(error => {
@@ -274,75 +297,149 @@ const SprintsPage: React.FC = () => {
           });
         promises.push(analysisPromise);
       } else {
-        console.log('Team and sprint unchanged, skipping AI analysis');
+        console.log('Team and sprint identifier unchanged, skipping AI analysis');
       }
 
       // Historical data promise
-      if (historyCount > 0 && currentSprint.sprint.index !== undefined) {
-        setLoadingMessage(`Loading ${historyCount} historical sprints...`);
-        const historicalPromises = Array.from({ length: historyCount }, (_, i) => {
-          const historicalIndex = currentSprint.sprint.index! - (i + 1);
-          return sprintApi.getSprintData(selectedTeam, historicalIndex, 'index').catch(err => {
-            console.warn(`Failed to get historical sprint at index ${historicalIndex}:`, err);
-            return null;
-          });
-        });
+      if (historyCount > 0 && currentSprintWithFlags.sprint.index !== undefined) {
+        const currentSprintIndex = currentSprintWithFlags.sprint.index;
+        
+        // Check if history count increased (only relevant when current sprint hasn't changed)
+        const historyCountIncreased = isCurrentSprintNotChange &&
+          historicalData !== null &&
+          historicalData.historicalSprints.length > 0 &&
+          previousSearchRef.current!.historyCount < historyCount;
 
-        const historicalDataPromise = Promise.all(historicalPromises)
-          .then(results => {
-            const historicalSprints = results
+        const historicalDataPromise = (async () => {
+          let historicalSprintsToLoad: SprintData[] = [];
+          let existingHistoricalSprints: SprintData[] = [];
+
+          if (isCurrentSprintNotChange && historicalData !== null && historicalData.historicalSprints.length > 0) {
+            // Current sprint hasn't changed - work with existing historical data
+            
+            if (historyCountIncreased) {
+              // Load new sprints to add to existing data
+              const allSprints = historicalData.historicalSprints;
+              const currentSmallestIndex = Math.min(...allSprints.map(s => s.sprint.index));
+              const targetSmallestIndex = currentSprintIndex - historyCount;
+              const newSprintsNeeded = currentSmallestIndex - targetSmallestIndex;
+              
+              if (newSprintsNeeded > 0) {
+                console.log(`Loading ${newSprintsNeeded} additional historical sprints...`);
+                setLoadingMessage(`Loading ${newSprintsNeeded} additional historical sprints...`);
+                
+                const newHistoricalPromises = Array.from({ length: newSprintsNeeded }, (_, i) => {
+                  const historicalIndex = currentSmallestIndex - (i + 1);
+                  return sprintApi.getSprintData(selectedTeam, historicalIndex, 'index').catch(err => {
+                    console.warn(`Failed to get historical sprint at index ${historicalIndex}:`, err);
+                    return null;
+                  });
+                });
+
+                const newHistoricalSprints = await Promise.all(newHistoricalPromises);
+                historicalSprintsToLoad = newHistoricalSprints
+                  .filter((s): s is SprintData => s !== null)
+                  .map(sprint => applyIssueFlagsToSprintData(sprint, {
+                    incidentField: teamConfig?.INCIDENT_FIELD,
+                    incidentRegex: teamConfig?.INCIDENT_REGEX
+                  }));
+                
+                existingHistoricalSprints = historicalData.historicalSprints;
+              } else {
+                // Already have all needed sprints, just slice
+                console.log('All requested historical sprints already loaded, slicing to requested count');
+                existingHistoricalSprints = historicalData.historicalSprints.slice(0, historyCount);
+              }
+            } else {
+              // History count decreased or unchanged - just slice existing data
+              console.log('History count not increased, slicing existing historical data');
+              existingHistoricalSprints = historicalData.historicalSprints.slice(0, historyCount);
+            }
+          } else {
+            // Load all historical sprints (team or sprint changed, or first load, or no existing data)
+            setLoadingMessage(`Loading ${historyCount} historical sprints...`);
+            const historicalPromises = Array.from({ length: historyCount }, (_, i) => {
+              const historicalIndex = currentSprintIndex - (i + 1);
+              return sprintApi.getSprintData(selectedTeam, historicalIndex, 'index').catch(err => {
+                console.warn(`Failed to get historical sprint at index ${historicalIndex}:`, err);
+                return null;
+              });
+            });
+
+            const results = await Promise.all(historicalPromises);
+            historicalSprintsToLoad = results
               .filter((s): s is SprintData => s !== null)
               .map(sprint => applyIssueFlagsToSprintData(sprint, {
                 incidentField: teamConfig?.INCIDENT_FIELD,
                 incidentRegex: teamConfig?.INCIDENT_REGEX
               }));
+          }
 
-            setHistoricalData(historicalSprints.length > 0 ? { currentSprint: currentSprintWithFlags, historicalSprints } : null);
+          // Combine existing and new historical sprints, sorted by sprint index (descending)
+          const allHistoricalSprints = [...existingHistoricalSprints, ...historicalSprintsToLoad]
+            .sort((a, b) => b.sprint.index - a.sprint.index)
+            .slice(0, historyCount); // Ensure we only keep the requested count
 
-            // Calculate stats for historical sprints
-            const historicalStats = historicalSprints.map(sprint => {
-              const histStats = calculateSprintStats(sprint);
-              const histDora = calculateDoraMetrics(sprint);
-              
-              // Filter builds to only include those in sprint for statistics
-              const inSprintBuilds = sprint.builds.filter(b => b.inSprint);
-              
-              // Calculate build/release summary per pipeline for historical sprint (only for in-sprint builds)
-              const buildSummaryByPipeline = calculateBuildSummaryByPipeline(inSprintBuilds);
-              
-              return {
-                sprintIndex: sprint.sprint.index,
-                sprintName: sprint.sprint.name,
-                totalIssues: sprint.issues.length,
-                totalPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
-                completedIssues: histStats.throughput,
-                completedPoints: histStats.velocity,
-                backAndForthIssues: sprint.issues.filter(issue => issue.flags?.isBackAndForth).length,
-                incidentIssues: sprint.issues.filter(issue => issue.flags?.isIncidentResponse).length,
-                totalBuilds: inSprintBuilds.length,
-                totalReleases: inSprintBuilds.filter(b => b.isRelease).length,
-                successfulBuilds: inSprintBuilds.filter(b => b.status === 'passed').length,
-                successfulReleases: inSprintBuilds.filter(b => b.isRelease && b.status === 'passed').length,
-                avgBuildDuration: inSprintBuilds.length > 0 
-                  ? inSprintBuilds.reduce((sum, b) => sum + b.duration, 0) / inSprintBuilds.length / 60
-                  : 0,
-                deploymentFrequency: histDora.deploymentFrequency,
-                medianLeadTime: histDora.avgLeadTime,
-                changeFailureRate: histDora.changeFailureRate,
-                medianMTTR: histDora.mttr,
-                buildSummaryByPipeline,
-              };
-            });
+          setHistoricalData(allHistoricalSprints.length > 0 ? { currentSprint: currentSprintWithFlags, historicalSprints: allHistoricalSprints } : null);
 
-            // Store historical stats in state for LLM chat
-            setHistoricalStats(historicalStats.length > 0 ? historicalStats : null);
-            console.log('Historical data loaded');
-          })
-          .catch(error => {
-            console.error('Historical data loading failed:', error);
+          // Calculate stats for all historical sprints
+          const historicalStats = allHistoricalSprints.map(sprint => {
+            const histStats = calculateSprintStats(sprint);
+            const histDora = calculateDoraMetrics(sprint);
+            
+            // Filter builds to only include those in sprint for statistics
+            const inSprintBuilds = sprint.builds.filter(b => b.inSprint);
+            
+            // Calculate build/release summary per pipeline for historical sprint (only for in-sprint builds)
+            const buildSummaryByPipeline = calculateBuildSummaryByPipeline(inSprintBuilds);
+            
+            return {
+              sprintIndex: sprint.sprint.index,
+              sprintName: sprint.sprint.name,
+              totalIssues: sprint.issues.length,
+              totalPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+              completedIssues: histStats.throughput,
+              completedPoints: histStats.velocity,
+              backAndForthIssues: sprint.issues.filter(issue => issue.flags?.isBackAndForth).length,
+              incidentIssues: sprint.issues.filter(issue => issue.flags?.isIncidentResponse).length,
+              totalBuilds: inSprintBuilds.length,
+              totalReleases: inSprintBuilds.filter(b => b.isRelease).length,
+              successfulBuilds: inSprintBuilds.filter(b => b.status === 'passed').length,
+              successfulReleases: inSprintBuilds.filter(b => b.isRelease && b.status === 'passed').length,
+              avgBuildDuration: inSprintBuilds.length > 0 
+                ? inSprintBuilds.reduce((sum, b) => sum + b.duration, 0) / inSprintBuilds.length / 60
+                : 0,
+              deploymentFrequency: histDora.deploymentFrequency,
+              medianLeadTime: histDora.avgLeadTime,
+              changeFailureRate: histDora.changeFailureRate,
+              medianMTTR: histDora.mttr,
+              buildSummaryByPipeline,
+            };
           });
+
+          // Store historical stats in state for LLM chat
+          setHistoricalStats(historicalStats.length > 0 ? historicalStats : null);
+          console.log('Historical data loaded');
+        })().catch(error => {
+          console.error('Historical data loading failed:', error);
+        });
+        
         promises.push(historicalDataPromise);
+      } else {
+        // Reset historical data if history count is 0
+        if (historyCount === 0) {
+          setHistoricalData(null);
+          setHistoricalStats(null);
+        }
       }
+
+      // Update previous search reference in all cases
+      previousSearchRef.current = {
+        team: selectedTeam,
+        sprintIdentifier: identifier,
+        currentSprintIndex: currentSprintWithFlags.sprint.index || 0,
+        historyCount: historyCount
+      };
 
       // Wait for both AI analysis and historical data to complete
       await Promise.all(promises);

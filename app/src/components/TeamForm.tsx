@@ -143,10 +143,10 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label="Buildkite Pipeline Names"
+            label="Buildkite Pipeline Names (with optional Release Regex)"
             value={formData.BUILDKITE_PIPELINES}
             onChange={handleChange('BUILDKITE_PIPELINES')}
-            placeholder="pipeline1,pipeline2,pipeline3"
+            placeholder="pipeline1,pipeline2:/prod release/,pipeline3"
           />
         </Grid>
 
@@ -166,17 +166,17 @@ const TeamForm: React.FC<TeamFormProps> = ({ team, onSave, onCancel }) => {
                     onChange={handleChange('INCIDENT_FIELD')}
                   >
                     <MenuItem value="">(none)</MenuItem>
-                    <MenuItem value="summary">summary</MenuItem>
-                    <MenuItem value="subCategory">subCategory</MenuItem>
+                    <MenuItem value="summary">Issue Summary</MenuItem>
+                    <MenuItem value="subCategory">SubCategory</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={3}>
                   <TextField
                     fullWidth
-                    label="Incident regex (/.../)"
+                    label="Incident regex (/sev[1-2]/)"
                     value={formData.INCIDENT_REGEX}
                     onChange={handleChange('INCIDENT_REGEX')}
-                    placeholder="/incident|sev[1-2]/i"
+                    placeholder="/sev[1-2]/"
                     disabled={!formData.INCIDENT_FIELD}
                   />
                 </Grid>
