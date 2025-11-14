@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { SprintData } from '../types';
-import { calculateDoraMetrics, calculateReleaseStats, isUsingStoryPoints } from '../services/stats';
+import { calculateDoraMetrics, calculateReleaseStats, isUsingStoryPoints, calculateSprintStats } from '../services/stats';
 
 interface SprintTrendsProps {
   currentSprint: SprintData;
@@ -57,6 +57,7 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
       const sprintIndex = extractSprintIndex(sprint.sprint.name, sprint.sprint.index);
       const doraMetrics = calculateDoraMetrics(sprint);
       const releaseStats = calculateReleaseStats(sprint);
+      const sprintStats = calculateSprintStats(sprint);
       
       // Calculate completion metrics
       const completedIssues = sprint.issues.filter(issue => issue.flags?.isCompleted).length;
@@ -79,6 +80,9 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
         leadTime: doraMetrics.avgLeadTime,
         changeFailureRate: doraMetrics.changeFailureRate,
         mttr: doraMetrics.mttr / 3600, // Convert to hours
+        
+        // Cycle time
+        avgCycleTime: sprintStats.avgCycleTime,
         
         // Story points and issues
         completedPoints,
@@ -162,6 +166,18 @@ const SprintTrends: React.FC<SprintTrendsProps> = ({
         ]
       }
     ] : []),
+    {
+      title: 'Average Cycle Time',
+      yAxisLabel: 'Days',
+      lines: [
+        {
+          dataKey: 'avgCycleTime',
+          stroke: '#9c27b0',
+          name: 'Avg Cycle Time (days)',
+          formatter: (value: number) => `${value.toFixed(1)} days`
+        }
+      ]
+    },
     {
       title: usingStoryPoints ? 'Completed Story Points & Issues' : 'Completed Issues',
       yAxisLabel: '',
