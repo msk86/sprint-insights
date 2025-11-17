@@ -289,16 +289,12 @@ export class JiraService {
 
       if (allHistory.length > 0) {
         // Find when work started (moved out of first column)
-        for (const event of allHistory) {
-          if (event.fromString === firstColumnName) {
-            workStartedAt = event.at;
-            break;
-          }
-        }
 
-        // If no move out of first column was found, check if issue was created in a non-first column
-        if (!workStartedAt && allHistory[0].fromString !== firstColumnName) {
-          // Issue was created directly in a non-first column, use creation time
+        workStartedAt = allHistory.find((event) => event.fromString === firstColumnName)?.at 
+          || allHistory.find((event) => event.fromString.toLowerCase() === 'backlog')?.at;
+
+        // If not moved out from first column but from backlog
+        if (!workStartedAt) {
           workStartedAt = issue.created;
         }
 

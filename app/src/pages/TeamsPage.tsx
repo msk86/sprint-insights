@@ -143,7 +143,7 @@ const TeamsPage: React.FC = () => {
                   Board ID: {team.JIRA_BOARD_ID}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Pipelines: {team.BUILDKITE_PIPELINES.split(',').length} configured
+                  Pipelines: {team.BUILDKITE_PIPELINES.split(',').filter(Boolean).length} configured
                 </Typography>
               </CardContent>
               <CardActions>

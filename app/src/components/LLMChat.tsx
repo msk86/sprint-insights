@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -49,6 +49,54 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Prepare allSprints once for all visualizations (enriched with timeSpent, includes builds, includes stats)
+  // Order: historical (reversed) + current
+  const allSprints = useMemo(() => {
+    const enrichSprint = (sprint: SprintData) => {
+      // Enrich issues with timeSpent and filter history
+      const enrichedIssues = sprint.issues.map(issue => ({
+        ...issue,
+        timeSpent: issue.timeSpent || calculateIssueTimeSpentOnColumns(issue, sprint),
+        // Filter out boundary events (inSprint: false) from history
+        history: issue.history.filter(h => h.inSprint)
+      }));
+      
+      // Calculate stats for this sprint
+      const sprintStats = calculateSprintStats(sprint);
+      const doraMetrics = calculateDoraMetrics(sprint);
+      const buildSummaryByPipeline = calculateBuildSummaryByPipeline(sprint.builds);
+      
+      const stats = {
+        sprintIndex: sprint.sprint.index,
+        sprintName: sprint.sprint.name,
+        totalIssues: sprint.issues.length,
+        totalPoints: sprint.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
+        completedIssues: sprintStats.throughput,
+        completedPoints: sprintStats.velocity,
+        backAndForthIssues: sprint.issues.filter(issue => issue.flags?.isBackAndForth).length,
+        incidentIssues: sprint.issues.filter(issue => issue.flags?.isIncidentResponse).length,
+        totalBuilds: sprint.builds.length,
+        totalReleases: sprint.builds.filter(b => b.isRelease).length,
+        successfulBuilds: sprint.builds.filter(b => b.status === 'passed').length,
+        successfulReleases: sprint.builds.filter(b => b.isRelease && b.status === 'passed').length,
+        avgBuildDuration: sprint.builds.length > 0 
+          ? sprint.builds.reduce((sum, b) => sum + b.duration, 0) / sprint.builds.length / 60
+          : 0,
+        deploymentFrequency: doraMetrics.deploymentFrequency,
+        medianLeadTime: doraMetrics.avgLeadTime,
+        changeFailureRate: doraMetrics.changeFailureRate,
+        medianMTTR: doraMetrics.mttr,
+        buildSummaryByPipeline,
+      };
+      
+      return { ...sprint, issues: enrichedIssues, stats };
+    };
+
+    const enrichedHistorical = historicalData?.map(enrichSprint) || [];
+    const enrichedCurrent = enrichSprint(sprintData);
+    return [...enrichedHistorical.reverse(), enrichedCurrent];
+  }, [sprintData, historicalData]);
+
   // Clear chat history when sprint data changes
   useEffect(() => {
     setMessages([]);
@@ -69,68 +117,36 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
     return keywords.some(keyword => lowerText.includes(keyword));
   };
 
-  const prepareCommonData = () => {
-    // Calculate stats for LLM context
-    const sprintStats = calculateSprintStats(sprintData);
-    const doraMetrics = calculateDoraMetrics(sprintData);
-    
-    // Calculate build/release summary per pipeline
-    const buildSummaryByPipeline = calculateBuildSummaryByPipeline(sprintData.builds);
-    
-    const stats = {
-      totalIssues: sprintData.issues.length,
-      totalPoints: sprintData.issues.reduce((sum, issue) => sum + issue.storyPoints, 0),
-      completedIssues: sprintStats.throughput,
-      completedPoints: sprintStats.velocity,
-      backAndForthIssues: sprintData.issues.filter(issue => issue.flags?.isBackAndForth).length,
-      incidentIssues: sprintData.issues.filter(issue => issue.flags?.isIncidentResponse).length,
-      totalBuilds: sprintData.builds.length,
-      totalReleases: sprintData.builds.filter(b => b.isRelease).length,
-      successfulBuilds: sprintData.builds.filter(b => b.status === 'passed').length,
-      successfulReleases: sprintData.builds.filter(b => b.isRelease && b.status === 'passed').length,
-      avgBuildDuration: sprintData.builds.length > 0 
-        ? sprintData.builds.reduce((sum, b) => sum + b.duration, 0) / sprintData.builds.length / 60
-        : 0,
-      deploymentFrequency: doraMetrics.deploymentFrequency,
-      medianLeadTime: doraMetrics.avgLeadTime,
-      changeFailureRate: doraMetrics.changeFailureRate,
-      medianMTTR: doraMetrics.mttr,
-      buildSummaryByPipeline,
+  const prepareLLMContext = () => {
+    // Extract stats from allSprints (current sprint is last element)
+    const currentSprint = allSprints[allSprints.length - 1];
+    const stats = currentSprint.stats;
+
+    // Remove builds from sprint data for LLM to reduce token usage
+    // (allSprints already has enriched issues with timeSpent and filtered history)
+    const sprintDataForLLM = {
+      ...currentSprint,
+      builds: []
     };
+    
+    const historicalDataForLLM = allSprints.slice(0, -1).map(sprint => ({
+      ...sprint,
+      builds: []
+    }));
 
-    // Enrich issues with timeSpent and filter out boundary events for LLM
-    const enrichIssuesWithTimeSpent = (data: SprintData) => {
-      const enrichedIssues = data.issues.map(issue => ({
-        ...issue,
-        timeSpent: calculateIssueTimeSpentOnColumns(issue, data),
-        // Filter out boundary events (inSprint: false) from history
-        history: issue.history.filter(h => h.inSprint)
-      }));
-      return { ...data, issues: enrichedIssues, builds: [] };
-    };
-
-    // Prepare sprint data without builds for LLM
-    const sprintDataForLLM = enrichIssuesWithTimeSpent(sprintData);
-    const historicalDataForLLM = historicalData?.map(sprint => enrichIssuesWithTimeSpent(sprint));
-
-    // Prepare chat history (exclude the current message that was just added)
+    // Build chat history with computed data from previous visualizations
     const chatHistory = messages.map(msg => {
-      // For chart/table responses, include the computed data so LLM can reference it in follow-up questions
       let content = msg.content;
       if (msg.type === 'assistant') {
         if (msg.chart && msg.computedData) {
-          // Include chart title and computed data
           const chartInfo = `Generated chart: ${msg.chart.title}\n\nChart Data (${msg.computedData.length} items):\n${JSON.stringify(msg.computedData, null, 2)}`;
           content = content ? `${content}\n\n${chartInfo}` : chartInfo;
         } else if (msg.table && msg.computedData) {
-          // Include table title and computed data
           const tableInfo = `Generated table: ${msg.table.title}\n\nTable Data (${msg.computedData.length} rows):\n${JSON.stringify(msg.computedData, null, 2)}`;
           content = content ? `${content}\n\n${tableInfo}` : tableInfo;
         } else if (msg.chart) {
-          // Fallback if computedData is not available
           content = content ? content : `Generated chart: ${msg.chart.title}`;
         } else if (msg.table) {
-          // Fallback if computedData is not available
           content = content ? content : `Generated table: ${msg.table.title}`;
         }
       }
@@ -175,7 +191,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
     setError(null);
 
     try {
-      const { stats, sprintDataForLLM, historicalDataForLLM, chatHistory } = prepareCommonData();
+      const { stats, sprintDataForLLM, historicalDataForLLM, chatHistory } = prepareLLMContext();
 
       const response = await llmApi.freeChat(
         sprintDataForLLM, 
@@ -220,7 +236,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
     setError(null);
 
     try {
-      const { stats, sprintDataForLLM, historicalDataForLLM, chatHistory } = prepareCommonData();
+      const { stats, sprintDataForLLM, historicalDataForLLM, chatHistory } = prepareLLMContext();
 
       const response = await llmApi.visualize(
         sprintDataForLLM, 
@@ -235,13 +251,15 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
       let computedData: any[] | undefined;
       if (response.chart || response.table) {
         try {
-          // Prepare allSprints data (similar to DynamicChart/DynamicTable)
-          const allSprints = historicalData ? [...historicalData, sprintData] : [sprintData];
           const dataTransformCode = response.chart?.dataTransform || response.table?.dataTransform || '';
           
-          // Execute the dataTransform function
+          // Execute the dataTransform function using pre-enriched allSprints from useMemo
           const dataTransformFunc = new Function('allSprints', `${dataTransformCode}`);
           computedData = dataTransformFunc(allSprints);
+          
+          // Export to window for debugging
+          (window as any).dataTransform = dataTransformFunc;
+          (window as any).allSprints = allSprints;
         } catch (error) {
           console.error('Error computing data for chat history:', error);
         }
@@ -311,8 +329,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
                   <Box sx={{ width: '100%', mt: message.content ? 1 : 0 }}>
                     <DynamicChart
                       chartConfig={message.chart}
-                      sprintData={sprintData}
-                      historicalData={historicalData}
+                      allSprints={allSprints}
                     />
                   </Box>
                 )}
@@ -320,8 +337,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ sprintData, historicalData, historica
                   <Box sx={{ width: '100%', mt: message.content ? 1 : 0 }}>
                     <DynamicTable
                       tableConfig={message.table}
-                      sprintData={sprintData}
-                      historicalData={historicalData}
+                      allSprints={allSprints}
                     />
                   </Box>
                 )}

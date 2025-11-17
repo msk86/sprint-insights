@@ -3,40 +3,18 @@ import { Box, Typography, Paper, Alert, IconButton, Dialog, DialogTitle, DialogC
 import { OpenInFull as OpenInFullIcon } from '@mui/icons-material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { TableConfiguration } from '../types';
-import { calculateIssueTimeSpentOnColumns } from '../services/issue';
 
 interface DynamicTableProps {
   tableConfig: TableConfiguration;
-  sprintData: any;
-  historicalData?: any[];
+  allSprints: any[];  // Pre-enriched sprint data with timeSpent, builds, and stats
 }
 
-const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, historicalData }) => {
+const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, allSprints }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { tableData, error } = useMemo(() => {
     try {
-      // Enrich all sprints with timeSpent and filter out boundary events
-      const enrichSprint = (sprint: any) => {
-        const enrichedIssues = sprint.issues.map((issue: any) => {
-          const timeSpent = issue.timeSpent || calculateIssueTimeSpentOnColumns(issue, sprint);
-          // Filter out boundary events (inSprint: false) from history
-          const filteredHistory = issue.history.filter((h: any) => h.inSprint);
-          return {
-            ...issue,
-            timeSpent,
-            history: filteredHistory
-          };
-        });
-        return { ...sprint, issues: enrichedIssues };
-      };
-
-      // Create allSprints array (current sprint is first)
-      const enrichedHistorical = historicalData?.map(enrichSprint) || [];
-      const enrichedCurrent = enrichSprint(sprintData);
-      const allSprints = [...enrichedHistorical.reverse(), enrichedCurrent];
-
-      // Execute the data transformation function
+      // Execute the data transformation function using pre-enriched allSprints
       // eslint-disable-next-line no-new-func
       const transformFn = new Function('allSprints', `
         ${tableConfig.dataTransform}
@@ -44,7 +22,7 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, hi
 
       // Export transform function to window for debugging
       (window as any).dataTransform = transformFn;
-      console.log('🐛 Debug: window.dataTransform exported (table)');
+      (window as any).allSprints = allSprints;
 
       const result = transformFn(allSprints);
       
@@ -58,7 +36,7 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ tableConfig, sprintData, hi
       console.error('Table data transformation error:', err);
       return { tableData: null, error: String(err) };
     }
-  }, [tableConfig, sprintData, historicalData]);
+  }, [tableConfig, allSprints]);
 
   if (error) {
     return (

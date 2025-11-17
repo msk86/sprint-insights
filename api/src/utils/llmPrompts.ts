@@ -223,11 +223,29 @@ interface Issue {
 interface Build {
   pipelineName: string; repository: string; status: string; startedAt: string; finishedAt: string; duration: number; isRelease: boolean; isReleaseSuccess: boolean; inSprint: boolean;
 }
+interface Stats {
+  totalIssues: number;
+  totalPoints: number;
+  completedIssues: number;
+  completedPoints: number;
+  backAndForthIssues: number;
+  incidentIssues: number;
+  totalBuilds: number;
+  totalReleases: number;
+  successfulBuilds: number;
+  successfulReleases: number;
+  avgBuildDuration: number;
+  deploymentFrequency: number;
+  medianLeadTime: number;
+  changeFailureRate: number;
+  medianMTTR: number;
+}
 interface SprintData { 
   sprint: { index: number; name: string; state: string; start: Date; end: Date; };
   columns: Array<{ name: string; }>;
   issues: Issue[]; 
   builds: Build[]; 
+  stats: Stats;
 }
 // Explaination for the inSprint field: It is to provide reference info about other sprints when do single sprint analysis, ideally you should filter the data by inSprint === true
 

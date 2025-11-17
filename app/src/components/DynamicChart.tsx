@@ -19,43 +19,20 @@ import {
   Cell,
 } from 'recharts';
 import { ChartConfiguration } from '../types';
-import { calculateIssueTimeSpentOnColumns } from '../services/issue';
 
 interface DynamicChartProps {
   chartConfig: ChartConfiguration;
-  sprintData: any;
-  historicalData?: any[];
+  allSprints: any[];  // Pre-enriched sprint data with timeSpent, builds, and stats
 }
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0'];
 
-const DynamicChart: React.FC<DynamicChartProps> = ({ chartConfig, sprintData, historicalData }) => {
+const DynamicChart: React.FC<DynamicChartProps> = ({ chartConfig, allSprints }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { chartData, error } = useMemo(() => {
     try {
-      // Enrich all sprints with timeSpent and filter out boundary events
-      const enrichSprint = (sprint: any) => {
-        const enrichedIssues = sprint.issues.map((issue: any) => {
-          const timeSpent = issue.timeSpent || calculateIssueTimeSpentOnColumns(issue, sprint);
-          // Filter out boundary events (inSprint: false) from history
-          const filteredHistory = issue.history.filter((h: any) => h.inSprint);
-          return {
-            ...issue,
-            timeSpent,
-            history: filteredHistory
-          };
-        });
-        return { ...sprint, issues: enrichedIssues };
-      };
-
-      // Create allSprints array (current sprint is LAST)
-      const enrichedHistorical = historicalData?.map(enrichSprint) || [];
-      const enrichedCurrent = enrichSprint(sprintData);
-      const allSprints = [...enrichedHistorical.reverse(), enrichedCurrent];
-
-      // Execute the data transformation function
-      // Only allSprints is available to match LLM prompt
+      // Execute the data transformation function using pre-enriched allSprints
       // eslint-disable-next-line no-new-func
       const transformFn = new Function('allSprints', `
         ${chartConfig.dataTransform}
@@ -71,7 +48,7 @@ const DynamicChart: React.FC<DynamicChartProps> = ({ chartConfig, sprintData, hi
       console.error('Chart data transformation error:', err);
       return { chartData: null, error: String(err) };
     }
-  }, [chartConfig, sprintData, historicalData]);
+  }, [chartConfig, allSprints]);
 
   if (error) {
     return (
